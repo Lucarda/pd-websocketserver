@@ -1,0 +1,195 @@
+<!--
+Copyright (C) 2016-2020  Davidson Francis <davidsondfgl@gmail.com>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>
+-->
+<html>
+<head>
+	<script>
+
+	/* WebSocket. */
+	var ws;
+	var connected = false;
+
+	function scoll_to_bottom()
+	{
+		var logTa = document.getElementById("taLog")
+		logTa.scrollTop = logTa.scrollHeight;
+    }
+
+	/* Establish connection. */
+	function doConnect(addr)
+	{
+		/* Message to be sent. */
+		var msg;
+
+		/* Do connection. */
+		ws = new WebSocket(addr);
+
+		/* Register events. */
+		ws.onopen = function()
+		{
+			connected = true;
+			document.getElementById("btConn").value = "Disconnect!";
+			document.getElementById("taLog").value += ("Connection opened\n");
+			scoll_to_bottom();
+		};
+
+		/* Deals with messages. */
+		ws.onmessage = function (evt)
+		{
+			document.getElementById("taLog").value += ("Recv: " + evt.data + "\n");
+			scoll_to_bottom();
+			
+		/* lucarda */	
+		var list = evt.data.split(" ");
+		if (list[0] == "sl1") {
+			document.getElementById("slider1").value = (list[1]);
+			};
+		
+		/*	Some URLs don't load inside iframes */	
+		if (list[0] == "browse") {
+		
+			list.shift();
+			document.getElementById("pdiframe").src = (list);
+			};	
+
+
+		/* this triggers window popup blocked
+		if (list[0] == "browse") {
+		
+			list.shift();
+			myWindow = window.open("list", "_blank");
+			
+			};	
+		*/
+
+			
+		if (list[0] == "h2") {
+		
+			list.shift();
+			var str = evt.data.replace("h2", "");
+			document.getElementById("h2").innerHTML += (str);
+			
+			};
+			
+		//console.log(list);
+		};
+
+		/* Close events. */
+		ws.onclose = function(event)
+		{
+			document.getElementById("btConn").value = "Connect!";
+			document.getElementById("taLog").value +=
+				("Connection closed: wasClean: " + event.wasClean + ", evCode: "
+					+ event.code + "\n");
+			scoll_to_bottom();
+			connected = false;
+		};
+	}
+
+	document.addEventListener("DOMContentLoaded", function(event)
+	{
+		/* Connect buttom. */
+		document.getElementById("btConn").onclick = function()
+		{
+			if (connected == false)
+			{
+				var txt = document.getElementById("txtServer").value;
+				doConnect(txt);
+			}
+
+			else
+			{
+				ws.close();
+				connected = false;
+				document.getElementById("btConn").value = "Connect!";
+			}
+		};
+
+		/* Input text message. */
+		document.getElementById("txtMsg").addEventListener('keyup', function(e)
+		{
+			var key = e.which || e.keyCode;
+			if (key == 13)
+				document.getElementById("btMsg").click();
+		});
+
+		/* Send message. */
+		document.getElementById("btMsg").onclick = function()
+		{
+			if (connected == true)
+			{
+				var txt = document.getElementById("txtMsg");
+				var log = document.getElementById("taLog");
+
+				ws.send(txt.value);
+				log.value += ("Send: " + txt.value + "\n");
+				txt.value = "";
+				scoll_to_bottom();
+			}
+		};
+		
+		
+		/*lucarda*/
+		
+		var slider1 = document.getElementById("slider1");
+		
+		slider1.oninput = function() {
+		//output.innerHTML = this.value;
+		ws.send("sl1 " + this.value);
+}
+		
+	});
+	</script>
+</head>
+<body>
+	
+	<div id="header">
+		<h1 align="left">wsServer</h1>
+		Server: <input type="text" id="txtServer" value="ws://localhost:8080">
+		<input type="button" id="btConn" name="btConn" value="Connect!"><br /><br />
+
+		
+		<!--
+		Connection type:
+		<input type="radio" name="port" id="port1" checked="true" value="ws:// (8080)"
+			onclick="document.getElementById('txtServer').value='ws://localhost:8080'">
+		<label for="port1">ws:// (8080)</label>
+
+		<input type="radio" name="port" id="port2" value="wss:// (443)"
+			onclick="document.getElementById('txtServer').value='ws://localhost:443'">
+		<label for="port2">wss:// (443)</label>
+
+		<br /> <br />
+		-->
+
+		Message: <input type="text" id="txtMsg" value=""
+			placeholder="Type your message (ENTER to send)">
+		<input type="button" id="btMsg" name="btMsg" value="Send"><br /><br />
+
+		<textarea rows="10" cols="50" id="taLog" name="taLog"></textarea> <br /><br />
+		
+		<input type="range" min="1" max="127" value="50" class="slider" id="slider1"> <br />
+		
+		<p>https://stackoverflow.com/questions/3450593/how-do-i-clear-the-content-of-a-div-using-javascript </p>
+		
+		<h2 id="h2"> </h2><br />
+		
+		
+		
+		<iframe src="" width="100%" height="100%" style="border:none;" id="pdiframe" > </iframe> 
+	</div>
+</body>
+</html>

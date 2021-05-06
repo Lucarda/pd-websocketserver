@@ -1,0 +1,7 @@
+Changelog for pd-websocketserver
+
+
+
+v0.0.0, dated 04-05-2021
+Initial version.
+
