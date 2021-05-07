@@ -8,7 +8,8 @@ os: osx
 script: 
   - "make PDDIR=Pd-0.51-4.app/Contents/Resources/ PDLIBDIR=./out-osx install"
 after_success: 
-  - "zip -r osx-release.zip ./osx-release"
+  - cd $TRAVIS_BUILD_DIR  
+  - "zip -r osx-release.zip out-osx"
 deploy:
   provider: releases
   draft: true
