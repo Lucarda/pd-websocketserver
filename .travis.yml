@@ -11,8 +11,12 @@ after_success:
   - "zip -r osx-release.zip ./osx-release"
 deploy:
   provider: releases
+  draft: true
+  name: ${TRAVIS_TAG}
+  tag_name: ${TRAVIS_TAG}
   api_key: "70OUb6ewSjSPx/bUGSrxJ82XA3W7X3lbNSGDtz5isGCF12LoJG+oFMr+dtlaJff/6E533hmZrQeao0TZBVxSI6NSHgav0fcaUtMwye6xktYQnYn3aj9BP9aj3cQfpiv8+KnIwjUQdymgm55P9Rpz0AVr5gYPZ+XvDYIz2Q+1ZIaqvwc3ag7ErnlJTWEllXJal7ueTjS1fRFxzu4tc8h51XeqoV1Ow/XbFPMwrtpJH68u/A3DmjPswikvJtefBp6+bqL4BtU8Qbj2NlWVbMDYbgUid9KyKAw1rfDBmGeXcXz0tkkEcqNrApfsgMiGd8l3TledRQvSOdw/S7cPRvhl6S+qOm24GIaykGIvffBgIJl7Jb/oGYkqeSy0SR1jxVFWU8rnsPURl+6X+seFUPu2rgNqweetmqzTvPjmmXJOsfW1TSIYXrAxRymEo0Wja59vw8JQurnlzxyZ6ZZoWrAGI8v7iuL5v/Fx5iaRTSbO8M0pVtst05i5/s3cDIJvNzAxLmZIvuTr63FfgSvc2At0OZ9npb0U/1I0eAzoc055CXVW/muhbMEW/cO2nJd8xPf/NHLf8y569UC+g6ziGxNf+dh8o6HQf9LTSu+4Q4/9bwH8/G/Ruv7Zdd++FlBvMX6zN6XVALDJBTSmQo4wH/G0M00A+atvTbUbCm/5/tShBuU="
   file: "osx-release.zip"
   skip_cleanup: true
   on:
+    repo: Lucarda/pd-websocketserver
     tags: true
