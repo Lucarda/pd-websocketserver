@@ -5,7 +5,6 @@ install:
   - "curl -L http://msp.ucsd.edu/Software/pd-0.51-4.mac.tar.gz -o ./pd.tar.gz"
   - "tar zxvf ./pd.tar.gz"
 language: c
-os: |-
-    osx
-    
-    - make PDDIR=Pd-0.51-4.app/Contents/Resources/ PDLIBDIR=./out-osx install
+os: osx
+script: 
+  - "make PDDIR=Pd-0.51-4.app/Contents/Resources/ PDLIBDIR=./out-osx install"
