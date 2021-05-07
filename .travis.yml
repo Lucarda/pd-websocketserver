@@ -1,4 +1,6 @@
 --- 
+after_success: ~
+before_deploy: ~
 git: 
   depth: 3
 install: 
@@ -8,3 +10,10 @@ language: c
 os: osx
 script: 
   - "make PDDIR=Pd-0.51-4.app/Contents/Resources/ PDLIBDIR=./out-osx install"
+  - 
+    after_success: 
+      - "cd $TRAVIS_BUILD_DIR"
+      - 
+        before_deploy: 
+          - 
+            - "zip -r $osx-release.zip ./osx-release"
