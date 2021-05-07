@@ -1,11 +1,12 @@
 language: c
 
-install:
+git:
+  depth: 3
 
+install:
     - curl -L http://msp.ucsd.edu/Software/pd-0.51-4.mac.tar.gz -o ./pd.tar.gz
     - tar zxvf ./pd.tar.gz
 os: osx
     compiler: clang
     script:
     - make PDDIR=Pd-0.51-4.app/Contents/Resources/ PDLIBDIR=./out-osx install
-   
