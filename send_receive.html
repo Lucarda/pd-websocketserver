@@ -52,40 +52,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 			document.getElementById("taLog").value += ("Recv: " + evt.data + "\n");
 			scoll_to_bottom();
 			
-		/* lucarda */	
+		/* pd-websocketserver */	
 		var list = evt.data.split(" ");
+		
 		if (list[0] == "sl1") {
 			document.getElementById("slider1").value = (list[1]);
 			};
 		
-		/*	Some URLs don't load inside iframes */	
-		if (list[0] == "browse") {
-		
-			list.shift();
-			document.getElementById("pdiframe").src = (list);
-			};	
-
-
-		/* this triggers window popup blocked
-		if (list[0] == "browse") {
-		
-			list.shift();
-			myWindow = window.open("list", "_blank");
-			
-			};	
-		*/
 
 			
 		if (list[0] == "h2") {
-		
-			list.shift();
 			var str = evt.data.replace("h2", "");
-			document.getElementById("h2").innerHTML += (str);
-			
+			document.getElementById("h2").innerHTML += (str);	
 			};
 			
-		//console.log(list);
+		if (list[0] == "clear-h2") {
+			document.getElementById("h2").innerHTML = " ";	
+			};
+			
+		//console.log(typeof evt.data);
 		};
+		
+		
+		
+		
+		
+		
+		
 
 		/* Close events. */
 		ws.onclose = function(event)
@@ -142,12 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 		};
 		
 		
-		/*lucarda*/
+		/* pd-websocketserver */
 		
 		var slider1 = document.getElementById("slider1");
 		
 		slider1.oninput = function() {
-		//output.innerHTML = this.value;
 		ws.send("sl1 " + this.value);
 }
 		
@@ -157,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 <body>
 	
 	<div id="header">
-		<h1 align="left">wsServer</h1>
+		<h1 align="left">pd-websocketserver</h1>
 		Server: <input type="text" id="txtServer" value="ws://localhost:8080">
 		<input type="button" id="btConn" name="btConn" value="Connect!"><br /><br />
 
@@ -183,13 +175,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 		
 		<input type="range" min="1" max="127" value="50" class="slider" id="slider1"> <br />
 		
-		<p>https://stackoverflow.com/questions/3450593/how-do-i-clear-the-content-of-a-div-using-javascript </p>
+		<p>See the code of this file to understand what has been done to interface with the websocket. </p>
 		
 		<h2 id="h2"> </h2><br />
 		
 		
 		
-		<iframe src="" width="100%" height="100%" style="border:none;" id="pdiframe" > </iframe> 
+		
 	</div>
 </body>
 </html>
