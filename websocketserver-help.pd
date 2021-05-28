@@ -50,7 +50,7 @@
 -1 -1 0 1;
 #X msg 311 54 sl1 \$1;
 #X floatatom 311 29 5 0 0 0 - - -;
-#X obj 277 170 t b a;
+#X obj 271 219 t b a;
 #X msg 311 118 h2 hello world;
 #X msg 311 141 h2 Print something<br>and something else;
 #X obj 137 84 f;
@@ -63,17 +63,17 @@
 #X msg 27 89 verbosity \$1;
 #X obj 27 68 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 0 1
 ;
-#X obj 462 393 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 1
+#X obj 462 393 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 0
 1;
 #X text 466 372 server running;
 #X obj 608 568 pdcontrol;
 #X msg 610 488 dir;
 #X msg 625 542 browse file:///\$1/send_receive.html;
-#X text 329 88 print to the html <div>;
+#X text 317 94 print to the html <div>;
 #X text 365 27 send to the slider in the html example;
 #X text 606 465 open the html example in the browser;
 #X text 148 585 receive from the slider in the html example;
-#X msg 282 223 some number: \$1;
+#X msg 279 260 some number: \$1;
 #X text 198 252 client id;
 #X obj 606 106 cnv 15 380 300 empty empty empty 20 12 0 14 -228856
 -66577 0;
@@ -92,7 +92,7 @@ patch:, f 42;
 #X text 116 13 connect <port number>;
 #X text 23 112 prints to the console. warning eats more CPU., f 15
 ;
-#X msg 336 169 clear-h2;
+#X msg 311 164 clear-h2;
 #X connect 0 0 10 0;
 #X connect 1 0 10 0;
 #X connect 2 0 10 1;
