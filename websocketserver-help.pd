@@ -3,13 +3,13 @@
 #X msg 41 38 disconnect;
 #X obj 223 318 vradio 15 1 0 2 empty empty empty 0 -8 0 10 -262144
 -1 -1 0;
-#X floatatom 171 270 5 0 0 0 - - -;
-#X obj 165 147 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+#X floatatom 174 240 5 0 0 0 - - -;
+#X obj 165 134 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
 -1 -1;
-#X msg 171 291 send \$1;
-#X floatatom 189 154 5 0 0 0 - - -;
-#X obj 188 179 t b f;
-#X obj 171 248 f;
+#X msg 182 272 send \$1;
+#X floatatom 189 141 5 0 0 0 - - -;
+#X obj 188 166 t b f;
+#X obj 174 218 f;
 #X obj 219 539 print;
 #X obj 172 365 websocketserver;
 #X floatatom 241 404 5 0 0 0 - - -;
@@ -36,21 +36,21 @@
 #X connect 7 1 10 0;
 #X connect 8 0 5 0;
 #X connect 10 0 9 0;
-#X restore 413 357 pd info;
-#X floatatom 407 529 5 0 0 0 - - -;
-#X floatatom 429 483 5 0 0 0 - - -;
-#X symbolatom 453 438 0 0 0 0 - - -;
-#X text 461 416 ip;
-#X text 436 464 close client;
-#X text 415 509 open client;
-#X obj 407 555 s sn;
-#X obj 190 220 r sn;
+#X restore 371 354 pd info;
+#X floatatom 365 526 5 0 0 0 - - -;
+#X floatatom 387 480 5 0 0 0 - - -;
+#X symbolatom 411 435 0 0 0 0 - - -;
+#X text 419 413 ip;
+#X text 394 461 close client;
+#X text 373 506 open client;
+#X obj 365 552 s sn;
+#X obj 193 190 r sn;
 #X obj 151 495 route sl1;
 #X obj 154 570 hsl 128 15 0 127 0 0 empty empty empty -2 -8 0 10 -262144
 -1 -1 0 1;
-#X msg 311 54 sl1 \$1;
-#X floatatom 311 29 5 0 0 0 - - -;
-#X obj 271 219 t b a;
+#X msg 271 66 sl1 \$1;
+#X floatatom 271 41 5 0 0 0 - - -;
+#X obj 293 187 t b a;
 #X msg 311 118 h2 hello world;
 #X msg 311 141 h2 Print something<br>and something else;
 #X obj 137 84 f;
@@ -63,39 +63,41 @@
 #X msg 27 89 verbosity \$1;
 #X obj 27 68 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 0 1
 ;
-#X obj 462 393 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 0
+#X obj 420 390 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 0
 1;
-#X text 466 372 server running;
-#X obj 574 486 pdcontrol;
-#X msg 581 428 dir;
-#X msg 591 460 browse file:///\$1/send_receive.html;
+#X text 424 369 server running;
+#X obj 539 492 pdcontrol;
+#X msg 546 434 dir;
+#X msg 556 466 browse file:///\$1/send_receive.html;
 #X text 317 94 print to the html <div>;
-#X text 365 27 send to the slider in the html example;
-#X text 568 406 open the html example in the browser;
+#X text 311 43 send to the slider in the html example;
+#X text 533 412 open the html example in the browser;
 #X text 148 585 receive from the slider in the html example;
 #X msg 279 260 some number: \$1;
-#X text 198 252 client id;
-#X obj 621 71 cnv 15 380 300 empty empty empty 20 12 0 14 -228856 -66577
+#X text 201 222 client id;
+#X obj 623 22 cnv 15 380 340 empty empty empty 20 12 0 14 -228856 -66577
 0;
-#X obj 646 223 websocketserver;
-#X text 723 271 4) extra info;
-#X text 671 318 2) outputs as list of bytes;
-#X text 642 341 1) outputs as Pd list;
-#X text 700 158 2) grater than 0 to broadcast to all connected clients
+#X obj 649 211 websocketserver;
+#X text 726 259 4) extra info;
+#X text 674 306 2) outputs as list of bytes;
+#X text 645 329 1) outputs as Pd list;
+#X text 703 146 2) grater than 0 to broadcast to all connected clients
 , f 30;
-#X text 735 196 3) anything - the message to be sent;
-#X text 695 294 3) client id;
-#X text 646 96 inlets for sending message(s):;
-#X text 641 249 oulets for the received message(s):;
-#X text 669 116 1) takes many self-explaining messages in this help
+#X text 738 184 3) anything - the message to be sent;
+#X text 698 282 3) client id;
+#X text 649 84 inlets for sending message(s):;
+#X text 644 237 oulets for the received message(s):;
+#X text 672 104 1) takes many self-explaining messages in this help
 patch:, f 42;
 #X text 116 13 connect <port number>;
 #X text 23 112 prints to the console. warning eats more CPU., f 15
 ;
 #X msg 311 164 clear-h2;
-#X text 615 572 - "nicinfo": shows the ip of your network card(s);
-#X text 614 593 - "webserver": http file server;
-#X text 601 550 useful companion objects you can get from Deken:;
+#X text 618 557 - "nicinfo": shows the ip of your network card(s);
+#X text 617 578 - "webserver": http file server;
+#X text 604 535 useful companion objects you can get from Deken:;
+#X text 704 24 [websocketserver] runs on another thread.;
+#X text 683 42 Each client that connects gets a new thread.;
 #X connect 0 0 10 0;
 #X connect 1 0 10 0;
 #X connect 2 0 10 1;
