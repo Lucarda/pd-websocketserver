@@ -66,33 +66,36 @@
 #X obj 462 393 tgl 15 0 empty empty empty 17 7 0 10 -262144 -1 -1 0
 1;
 #X text 466 372 server running;
-#X obj 608 568 pdcontrol;
-#X msg 610 488 dir;
-#X msg 625 542 browse file:///\$1/send_receive.html;
+#X obj 574 486 pdcontrol;
+#X msg 581 428 dir;
+#X msg 591 460 browse file:///\$1/send_receive.html;
 #X text 317 94 print to the html <div>;
 #X text 365 27 send to the slider in the html example;
-#X text 606 465 open the html example in the browser;
+#X text 568 406 open the html example in the browser;
 #X text 148 585 receive from the slider in the html example;
 #X msg 279 260 some number: \$1;
 #X text 198 252 client id;
-#X obj 606 106 cnv 15 380 300 empty empty empty 20 12 0 14 -228856
--66577 0;
-#X obj 631 258 websocketserver;
-#X text 708 306 4) extra info;
-#X text 656 353 2) outputs as list of bytes;
-#X text 627 376 1) outputs as Pd list;
-#X text 685 193 2) grater than 0 to broadcast to all connected clients
+#X obj 621 71 cnv 15 380 300 empty empty empty 20 12 0 14 -228856 -66577
+0;
+#X obj 646 223 websocketserver;
+#X text 723 271 4) extra info;
+#X text 671 318 2) outputs as list of bytes;
+#X text 642 341 1) outputs as Pd list;
+#X text 700 158 2) grater than 0 to broadcast to all connected clients
 , f 30;
-#X text 720 231 3) anything - the message to be sent;
-#X text 680 329 3) client id;
-#X text 631 131 inlets for sending message(s):;
-#X text 626 284 oulets for the received message(s):;
-#X text 654 151 1) takes many self-explaining messages in this help
+#X text 735 196 3) anything - the message to be sent;
+#X text 695 294 3) client id;
+#X text 646 96 inlets for sending message(s):;
+#X text 641 249 oulets for the received message(s):;
+#X text 669 116 1) takes many self-explaining messages in this help
 patch:, f 42;
 #X text 116 13 connect <port number>;
 #X text 23 112 prints to the console. warning eats more CPU., f 15
 ;
 #X msg 311 164 clear-h2;
+#X text 615 572 - "nicinfo": shows the ip of your network card(s);
+#X text 614 593 - "webserver": http file server;
+#X text 601 550 useful companion objects you can get from Deken:;
 #X connect 0 0 10 0;
 #X connect 1 0 10 0;
 #X connect 2 0 10 1;
