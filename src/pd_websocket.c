@@ -368,6 +368,8 @@ static void websocketserver_main(t_websocketserver *x, t_float portpd) {
 	memset(&x->opencloselist, 0, (sizeof(int)) * MAX_CLIENTS);
 
 	x->pd_port = (uint16_t)portpd;
+	
+	x->started = 1;
 
     x->pthrdexitmain = pthread_create(&x->tid, NULL, pthreadwrap, x);
 
