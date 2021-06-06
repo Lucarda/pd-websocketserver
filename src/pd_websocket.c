@@ -76,6 +76,9 @@ void onopen(int fd, t_websocketserver *x)
 {
 	char *cli;
 	cli = ws_getaddress(fd);
+	
+	sys_lock();
+	
 	if (x->verbosity) {
 	logpost(x,2,"Connection opened, client: %d | addr: %s", fd, cli);
 	}
@@ -87,6 +90,8 @@ void onopen(int fd, t_websocketserver *x)
 	client_open(x, fd);
 	
     outlet_list(x->list_out2, NULL, 3, ap);
+	
+	sys_unlock();
 	
 	
 	free(cli);
@@ -105,6 +110,9 @@ void onclose(int fd, t_websocketserver *x)
 {
 	char *cli;
 	cli = ws_getaddress(fd);
+	
+	sys_lock();
+	
 	if (x->verbosity) {
 	logpost(x,2,"Connection closed, client: %d | addr: %s", fd, cli);
 	}
@@ -116,6 +124,8 @@ void onclose(int fd, t_websocketserver *x)
     outlet_list(x->list_out2, NULL, 3, ap);
 	
 	client_close(x, fd);
+	
+	sys_unlock();
 	
 	
 	free(cli);
@@ -141,6 +151,9 @@ void onmessage(int fd, const unsigned char *msg, uint64_t size, int type, t_webs
 {
 	char *cli;
 	cli = ws_getaddress(fd);
+	
+	sys_lock();
+	
 	if (x->verbosity) {
 	logpost(x,2,"I receive a message: %s (size: %" PRId64 ", type: %d), from: %s/%d",
 		msg, size, type, cli, fd);
@@ -151,6 +164,8 @@ void onmessage(int fd, const unsigned char *msg, uint64_t size, int type, t_webs
 	fudiparse_binbuf(x, msg);
 	
 	outlet_float(x->sock_out, (t_float)fd);
+	
+	sys_unlock();
 	
 	free(cli);
 
