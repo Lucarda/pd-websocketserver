@@ -1365,7 +1365,7 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
 	SETFLOAT(&x->serverstatus[1], 1);
 	outlet_list(x->list_out2, NULL, 2, x->serverstatus);
-	x->started = 1;
+	
 	
 	len = sizeof(struct sockaddr_in);
 	memset(client_socks, -1, sizeof(client_socks));
