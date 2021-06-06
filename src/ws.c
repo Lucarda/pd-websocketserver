@@ -1433,7 +1433,6 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 	} 
 	sleep(2);
 	logpost(x,2,"websocket port: %d closed.", x->pd_port);
-	x->started = 0;
 	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
 	SETFLOAT(&x->serverstatus[1], 0);
 	outlet_list(x->list_out2, NULL, 2, x->serverstatus);

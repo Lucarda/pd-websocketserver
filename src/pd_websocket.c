@@ -338,6 +338,10 @@ static void websocketserver_disconnect(t_websocketserver *x) {
 		close(x->intersocket);	
 	#endif
 	
+	(void) pthread_join(&x->tid, NULL);
+	
+	x->started = 0;
+	
 }
 
 static void websocketserver_free(t_websocketserver *x) {
