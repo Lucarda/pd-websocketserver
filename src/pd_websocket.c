@@ -29,12 +29,15 @@
 #include <string.h>
 #include <ws.h>
 
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #else			
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <time.h>
 #endif
 
 
@@ -48,6 +51,7 @@ static void fudiparse_binbuf(t_websocketserver *x, const unsigned char *msg);
 static void fudi_bytes_outlet(t_websocketserver *x, const unsigned char *msg);
 static void client_open(t_websocketserver *x, int fd);
 static void client_close(t_websocketserver *x, int fd);
+static void websocketserver_disconnect(t_websocketserver *x);
 
 
 
@@ -361,6 +365,13 @@ static void websocketserver_disconnect(t_websocketserver *x) {
 
 static void websocketserver_free(t_websocketserver *x) {
 	
+	websocketserver_disconnect(x);
+	
+#ifdef _WIN32
+		Sleep(1000);
+#else
+		sleep(1);
+#endif
 	
 	freebytes(x->x_atoms, sizeof(*x->x_atoms) * x->x_numatoms);
 	x->x_atoms = NULL;
