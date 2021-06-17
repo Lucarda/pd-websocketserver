@@ -357,7 +357,7 @@ static void websocketserver_disconnect(t_websocketserver *x) {
 		close(x->intersocket);	
 	#endif
 	
-	(void) pthread_join(&x->tid, NULL);
+	pthread_join(x->tid, NULL);
 	
 	x->started = 0;
 	
@@ -367,11 +367,6 @@ static void websocketserver_free(t_websocketserver *x) {
 	
 	websocketserver_disconnect(x);
 	
-#ifdef _WIN32
-		Sleep(1000);
-#else
-		sleep(1);
-#endif
 	
 	freebytes(x->x_atoms, sizeof(*x->x_atoms) * x->x_numatoms);
 	x->x_atoms = NULL;
