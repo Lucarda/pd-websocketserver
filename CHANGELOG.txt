@@ -1,6 +1,6 @@
 Changelog for pd-websocketserver
 
-v0.0.1, dated 08-06-2021
+v0.0.1, dated 17-06-2021
 - Fix "race condition" (thanks Christof Ressi for pointing it).
 - deleting the object takes a couple of seconds to wait for the thread to finish.
 
