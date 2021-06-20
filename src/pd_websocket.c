@@ -29,6 +29,7 @@
 #include <string.h>
 #include <ws.h>
 
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -48,6 +49,7 @@ static void fudiparse_binbuf(t_websocketserver *x, const unsigned char *msg);
 static void fudi_bytes_outlet(t_websocketserver *x, const unsigned char *msg);
 static void client_open(t_websocketserver *x, int fd);
 static void client_close(t_websocketserver *x, int fd);
+static void websocketserver_disconnect(t_websocketserver *x);
 
 
 
@@ -76,6 +78,9 @@ void onopen(int fd, t_websocketserver *x)
 {
 	char *cli;
 	cli = ws_getaddress(fd);
+	
+	sys_lock();
+	
 	if (x->verbosity) {
 	logpost(x,2,"Connection opened, client: %d | addr: %s", fd, cli);
 	}
@@ -87,6 +92,8 @@ void onopen(int fd, t_websocketserver *x)
 	client_open(x, fd);
 	
     outlet_list(x->list_out2, NULL, 3, ap);
+	
+	sys_unlock();
 	
 	
 	free(cli);
@@ -105,6 +112,9 @@ void onclose(int fd, t_websocketserver *x)
 {
 	char *cli;
 	cli = ws_getaddress(fd);
+	
+	sys_lock();
+	
 	if (x->verbosity) {
 	logpost(x,2,"Connection closed, client: %d | addr: %s", fd, cli);
 	}
@@ -116,6 +126,8 @@ void onclose(int fd, t_websocketserver *x)
     outlet_list(x->list_out2, NULL, 3, ap);
 	
 	client_close(x, fd);
+	
+	sys_unlock();
 	
 	
 	free(cli);
@@ -141,6 +153,9 @@ void onmessage(int fd, const unsigned char *msg, uint64_t size, int type, t_webs
 {
 	char *cli;
 	cli = ws_getaddress(fd);
+	
+	sys_lock();
+	
 	if (x->verbosity) {
 	logpost(x,2,"I receive a message: %s (size: %" PRId64 ", type: %d), from: %s/%d",
 		msg, size, type, cli, fd);
@@ -151,6 +166,8 @@ void onmessage(int fd, const unsigned char *msg, uint64_t size, int type, t_webs
 	fudiparse_binbuf(x, msg);
 	
 	outlet_float(x->sock_out, (t_float)fd);
+	
+	sys_unlock();
 	
 	free(cli);
 
@@ -338,9 +355,15 @@ static void websocketserver_disconnect(t_websocketserver *x) {
 		close(x->intersocket);	
 	#endif
 	
+	pthread_join(x->tid, NULL);
+	
+	x->started = 0;
+	
 }
 
 static void websocketserver_free(t_websocketserver *x) {
+	
+	websocketserver_disconnect(x);
 	
 	
 	freebytes(x->x_atoms, sizeof(*x->x_atoms) * x->x_numatoms);
@@ -368,6 +391,8 @@ static void websocketserver_main(t_websocketserver *x, t_float portpd) {
 	memset(&x->opencloselist, 0, (sizeof(int)) * MAX_CLIENTS);
 
 	x->pd_port = (uint16_t)portpd;
+	
+	x->started = 1;
 
     x->pthrdexitmain = pthread_create(&x->tid, NULL, pthreadwrap, x);
 
