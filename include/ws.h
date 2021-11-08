@@ -40,7 +40,39 @@ extern "C" {
 	/**
 	 * @brief Max clients connected simultaneously.
 	 */
-	#define MAX_CLIENTS    8
+	#define MAX_CLIENTS    64 // 8
+	
+/////// Pd ////// 
+
+#include "m_pd.h"
+#include <pthread.h>
+	
+typedef struct _websocketserver {
+  t_object  x_obj;
+  int pthrdexitmain;
+  pthread_t tid;
+  int intersocket;
+  uint16_t pd_port;
+  t_canvas  *x_canvas;
+  t_outlet *x_msgout, *bytes_out, *sock_out, *list_out2; 
+  int connection_index;
+  t_float broad;
+  char fudi[MAXPDSTRING];
+  int opencloselist[MAX_CLIENTS];
+  int started;
+  t_atom *x_atoms;
+  size_t x_numatoms;
+  int verbosity;
+  t_atom serverstatus[2];
+  
+  int port_index;
+  int sock;
+  
+} t_websocketserver;
+	
+/////// end Pd //////
+	
+	
 
 	/**
 	 * @brief Max number of `ws_server` instances running
@@ -239,18 +271,18 @@ extern "C" {
 		/**
 		 * @brief On open event, called when a new client connects.
 		 */
-		void (*onopen)(int);
+		void (*onopen)(int, t_websocketserver *x);
 
 		/**
 		 * @brief On close event, called when a client disconnects.
 		 */
-		void (*onclose)(int);
+		void (*onclose)(int, t_websocketserver *x);
 
 		/**
 		 * @brief On message event, called when a client sends a text
 		 * or binary message.
 		 */
-		void (*onmessage)(int, const unsigned char *, uint64_t, int);
+		void (*onmessage)(int, const unsigned char *, uint64_t, int, t_websocketserver *x);
 	};
 
 	/* Forward declarations. */
@@ -264,7 +296,7 @@ extern "C" {
 		bool broadcast);
 	extern int ws_get_state(int fd);
 	extern int ws_close_client(int fd);
-	extern int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop);
+	extern int ws_socket(struct ws_events *evs, t_websocketserver *x);
 
 #ifdef AFL_FUZZ
 	extern int ws_file(struct ws_events *evs, const char *file);

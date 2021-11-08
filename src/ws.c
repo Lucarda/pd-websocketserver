@@ -660,7 +660,7 @@ static inline int is_control_frame(int frame)
  * @attention This is part of the internal API and is documented just
  * for completeness.
  */
-static int do_handshake(struct ws_frame_data *wfd, int p_index)
+static int do_handshake(struct ws_frame_data *wfd, int p_index, t_websocketserver *x )
 {
 	char *response; /* Handshake response message. */
 	char *p;        /* Last request line pointer.  */
@@ -703,7 +703,7 @@ static int do_handshake(struct ws_frame_data *wfd, int p_index)
 	}
 
 	/* Trigger events and clean up buffers. */
-	ports[p_index].events.onopen(CLI_SOCK(wfd->sock));
+	ports[p_index].events.onopen(CLI_SOCK(wfd->sock), x);
 	free(response);
 	return (0);
 }
@@ -1278,7 +1278,7 @@ static int next_frame(struct ws_frame_data *wfd, int idx)
  * @attention This is part of the internal API and is documented just
  * for completeness.
  */
-static void *ws_establishconnection(void *vsock)
+static void *ws_establishconnection(t_websocketserver *x)
 {
 	struct ws_frame_data wfd; /* WebSocket frame data.   */
 	int connection_index;     /* Client connect. index.  */
@@ -1286,7 +1286,7 @@ static void *ws_establishconnection(void *vsock)
 	int p_index;              /* Port list index.        */
 	int sock;                 /* File descriptor.        */
 
-	connection_index = (int)(intptr_t)vsock;
+	connection_index = x->connection_index;
 	sock             = client_socks[connection_index].client_sock;
 	p_index          = client_socks[connection_index].port_index;
 
@@ -1295,7 +1295,7 @@ static void *ws_establishconnection(void *vsock)
 	wfd.sock = sock;
 
 	/* Do handshake. */
-	if (do_handshake(&wfd, p_index) < 0)
+	if (do_handshake(&wfd, p_index, x) < 0)
 		goto closed;
 
 	/* Change state. */
@@ -1309,7 +1309,7 @@ static void *ws_establishconnection(void *vsock)
 			!wfd.error)
 		{
 			ports[p_index].events.onmessage(
-				sock, wfd.msg, wfd.frame_size, wfd.frame_type);
+				sock, wfd.msg, wfd.frame_size, wfd.frame_type, x);
 		}
 
 		/* Close event. */
@@ -1340,7 +1340,7 @@ static void *ws_establishconnection(void *vsock)
 	 * or server closure, as the server is expected to
 	 * always know when the client disconnects.
 	 */
-	ports[p_index].events.onclose(sock);
+	ports[p_index].events.onclose(sock, x);
 
 closed:
 	pthread_mutex_lock(&client_socks[connection_index].mtx_state);
@@ -1365,7 +1365,7 @@ closed:
 	pthread_cond_destroy(&client_socks[connection_index].cnd_state_close);
 	pthread_mutex_destroy(&client_socks[connection_index].mtx_state);
 	client_socks[connection_index].close_thrd = false;
-	return (vsock);
+	return (x->connection_index);
 }
 
 /**
@@ -1380,9 +1380,9 @@ closed:
  * @attention This is part of the internal API and is documented just
  * for completeness.
  */
-static void *ws_accept(void *data)
+static void *ws_accept(t_websocketserver *x)
 {
-	struct ws_accept *accept_data; /* Accept thread data.    */
+	//struct ws_accept *accept_data; /* Accept thread data.    */
 	struct sockaddr_in client;     /* Client.                */
 	pthread_t client_thread;       /* Client thread.         */
 	int connection_index;          /* Free connection slot.  */
@@ -1391,14 +1391,14 @@ static void *ws_accept(void *data)
 	int i;                         /* Loop index.            */
 
 	connection_index = 0;
-	accept_data      = data;
+	//accept_data      = data;
 	len              = sizeof(struct sockaddr_in);
 
 	while (1)
 	{
 		/* Accept. */
 		new_sock =
-			accept(accept_data->sock, (struct sockaddr *)&client, (socklen_t *)&len);
+			accept(x->sock, (struct sockaddr *)&client, (socklen_t *)&len);
 
 		if (new_sock < 0)
 			panic("Error on accepting connections..");
@@ -1410,10 +1410,10 @@ static void *ws_accept(void *data)
 			if (client_socks[i].client_sock == -1)
 			{
 				client_socks[i].client_sock = new_sock;
-				client_socks[i].port_index  = accept_data->port_index;
+				client_socks[i].port_index  = x->port_index;
 				client_socks[i].state       = WS_STATE_CONNECTING;
 				client_socks[i].close_thrd  = false;
-				connection_index            = i;
+				x->connection_index            = i;
 
 				if (pthread_mutex_init(&client_socks[i].mtx_state, NULL))
 					panic("Error on allocating close mutex");
@@ -1428,7 +1428,7 @@ static void *ws_accept(void *data)
 		if (i != MAX_CLIENTS)
 		{
 			if (pthread_create(&client_thread, NULL, ws_establishconnection,
-					(void *)(intptr_t)connection_index))
+					x)
 				panic("Could not create the client thread!");
 
 			pthread_detach(client_thread);
@@ -1458,21 +1458,22 @@ static void *ws_accept(void *data)
  * value. Each call _should_ have a different port and can have
  * different events configured.
  */
-int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop)
+int ws_socket(struct ws_events *evs, t_websocketserver *x)
 {
-	struct ws_accept *accept_data; /* Accept thread data.    */
+	//struct ws_accept *accept_data; /* Accept thread data.    */
 	struct sockaddr_in server;     /* Server.                */
 	pthread_t accept_thread;       /* Accept thread.         */
 	int reuse;                     /* Socket option.         */
+	int thread_loop = 0;
 
 	/* Checks if the event list is a valid pointer. */
 	if (evs == NULL)
 		panic("Invalid event list!");
 
 	/* Allocates our accept data. */
-	accept_data = malloc(sizeof(*accept_data));
-	if (!accept_data)
-		panic("Cannot allocate accept data, out of memory!\n");
+//	accept_data = malloc(sizeof(*accept_data));
+//	if (!accept_data)
+//		panic("Cannot allocate accept data, out of memory!\n");
 
 	pthread_mutex_lock(&mutex);
 	if (port_index >= MAX_PORTS)
@@ -1480,13 +1481,13 @@ int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop)
 		pthread_mutex_unlock(&mutex);
 		panic("too much websocket ports opened !");
 	}
-	accept_data->port_index = port_index;
+	x->port_index = port_index;
 	port_index++;
 	pthread_mutex_unlock(&mutex);
 
 	/* Copy events. */
-	memcpy(&ports[accept_data->port_index].events, evs, sizeof(struct ws_events));
-	ports[accept_data->port_index].port_number = port;
+	memcpy(&ports[x->port_index].events, evs, sizeof(struct ws_events));
+	ports[x->port_index].port_number = x->pd_port;
 
 #ifdef _WIN32
 	WSADATA wsaData;
@@ -1508,12 +1509,12 @@ int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop)
 
 	/* Create socket. */
 	accept_data->sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (accept_data->sock < 0)
+	if (x->sock < 0)
 		panic("Could not create socket");
 
 	/* Reuse previous address. */
 	reuse = 1;
-	if (setsockopt(accept_data->sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse,
+	if (setsockopt(x->sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse,
 			sizeof(reuse)) < 0)
 	{
 		panic("setsockopt(SO_REUSEADDR) failed");
@@ -1522,14 +1523,14 @@ int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop)
 	/* Prepare the sockaddr_in structure. */
 	server.sin_family      = AF_INET;
 	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port        = htons(port);
+	server.sin_port        = htons(x->pd_port);
 
 	/* Bind. */
-	if (bind(accept_data->sock, (struct sockaddr *)&server, sizeof(server)) < 0)
+	if (bind(x->sock, (struct sockaddr *)&server, sizeof(server)) < 0)
 		panic("Bind failed");
 
 	/* Listen. */
-	listen(accept_data->sock, MAX_CLIENTS);
+	listen(x->sock, MAX_CLIENTS);
 
 	/* Wait for incoming connections. */
 	printf("Waiting for incoming connections...\n");
@@ -1540,7 +1541,7 @@ int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop)
 		ws_accept(accept_data);
 	else
 	{
-		if (pthread_create(&accept_thread, NULL, ws_accept, accept_data))
+		if (pthread_create(&accept_thread, NULL, ws_accept, x))
 			panic("Could not create the client thread!");
 		pthread_detach(accept_thread);
 	}
