@@ -1427,8 +1427,7 @@ static void *ws_accept(t_websocketserver *x)
 		/* Client socket added to socks list ? */
 		if (i != MAX_CLIENTS)
 		{
-			if (pthread_create(&client_thread, NULL, ws_establishconnection,
-					x)
+			if (pthread_create(&client_thread, NULL, ws_establishconnection, x))
 				panic("Could not create the client thread!");
 
 			pthread_detach(client_thread);
@@ -1436,8 +1435,8 @@ static void *ws_accept(t_websocketserver *x)
 		else
 			close_socket(new_sock);
 	}
-	free(data);
-	return (data);
+	//free(data);
+	return;
 }
 
 /**
@@ -1464,7 +1463,7 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 	struct sockaddr_in server;     /* Server.                */
 	pthread_t accept_thread;       /* Accept thread.         */
 	int reuse;                     /* Socket option.         */
-	int thread_loop = 0;
+	int thread_loop = 1;
 
 	/* Checks if the event list is a valid pointer. */
 	if (evs == NULL)
@@ -1508,7 +1507,7 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 #endif
 
 	/* Create socket. */
-	accept_data->sock = socket(AF_INET, SOCK_STREAM, 0);
+	x->sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (x->sock < 0)
 		panic("Could not create socket");
 
@@ -1538,12 +1537,21 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 
 	/* Accept connections. */
 	if (!thread_loop)
-		ws_accept(accept_data);
-	else
+		printf("hello");//ws_accept(accept_data);
+	else 
 	{
 		if (pthread_create(&accept_thread, NULL, ws_accept, x))
 			panic("Could not create the client thread!");
 		pthread_detach(accept_thread);
+	
+
+	sleep(2);
+	logpost(x,2,"websocket port: %d closed.", x->pd_port);
+	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
+	SETFLOAT(&x->serverstatus[1], 0);
+	outlet_list(x->list_out2, NULL, 2, x->serverstatus);
+	pthread_exit(NULL);
+	
 	}
 
 	return (0);
