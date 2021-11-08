@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2020  Davidson Francis <davidsondfgl@gmail.com>
+ * Copyright (C) 2016-2021  Davidson Francis <davidsondfgl@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,13 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
- 
- /*
- * pd-websocketserver modifications 
- * Copyright (c) 2021 Lucas Cordiviola <lucarda27@hotmail.com>
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
 
 /**
  * @dir include/
@@ -32,10 +25,14 @@
 #ifndef WS_H
 #define WS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 	#include <stdbool.h>
 	#include <stdint.h>
 	#include <inttypes.h>
-	
+
 	/**
 	 * @name Global configurations
 	 */
@@ -43,38 +40,7 @@
 	/**
 	 * @brief Max clients connected simultaneously.
 	 */
-	#define MAX_CLIENTS    64 // 8
-	
-
-	
-/////// Pd ////// 
-
-#include "m_pd.h"
-#include <pthread.h>
-	
-typedef struct _websocketserver {
-  t_object  x_obj;
-  int pthrdexitmain;
-  pthread_t tid;
-  int intersocket;
-  uint16_t pd_port;
-  t_canvas  *x_canvas;
-  t_outlet *x_msgout, *bytes_out, *sock_out, *list_out2; 
-  int connection_index;
-  t_float broad;
-  char fudi[MAXPDSTRING];
-  int opencloselist[MAX_CLIENTS];
-  int started;
-  t_atom *x_atoms;
-  size_t x_numatoms;
-  int verbosity;
-  t_atom serverstatus[2];
-  
-} t_websocketserver;
-	
-/////// end Pd //////
-
-
+	#define MAX_CLIENTS    8
 
 	/**
 	 * @brief Max number of `ws_server` instances running
@@ -200,6 +166,10 @@ typedef struct _websocketserver {
 	 */
 	#define WS_CLSE_PROTERR 1002
 	/**@}*/
+	/**
+	 * @brief Inconsistent message (invalid utf-8)
+	 */
+	#define WS_CLSE_INVUTF8 1007
 
 	/**
 	 * @name Connection states
@@ -253,8 +223,12 @@ typedef struct _websocketserver {
 
 	#ifndef AFL_FUZZ
 	#define CLI_SOCK(sock) (sock)
+	#define SEND(fd,buf,len) send_all((fd), (buf), (len), MSG_NOSIGNAL)
+	#define RECV(fd,buf,len) recv((fd), (buf), (len), 0)
 	#else
 	#define CLI_SOCK(sock) (fileno(stdout))
+	#define SEND(fd,buf,len) write(fileno(stdout), (buf), (len))
+	#define RECV(fd,buf,len) read((fd), (buf), (len))
 	#endif
 
 	/**
@@ -265,19 +239,18 @@ typedef struct _websocketserver {
 		/**
 		 * @brief On open event, called when a new client connects.
 		 */
-		void (*onopen)(int, t_websocketserver *x);
+		void (*onopen)(int);
 
 		/**
 		 * @brief On close event, called when a client disconnects.
 		 */
-		void (*onclose)(int, t_websocketserver *x);
+		void (*onclose)(int);
 
 		/**
 		 * @brief On message event, called when a client sends a text
 		 * or binary message.
 		 */
-		void (*onmessage)(int, const unsigned char *, uint64_t, int, t_websocketserver *x);
-		
+		void (*onmessage)(int, const unsigned char *, uint64_t, int);
 	};
 
 	/* Forward declarations. */
@@ -291,13 +264,14 @@ typedef struct _websocketserver {
 		bool broadcast);
 	extern int ws_get_state(int fd);
 	extern int ws_close_client(int fd);
-// orig extern int ws_socket(struct ws_events *evs, uint16_t port);
-	extern int ws_socket(struct ws_events *evs, t_websocketserver *x);
+	extern int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop);
 
 #ifdef AFL_FUZZ
 	extern int ws_file(struct ws_events *evs, const char *file);
 #endif
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* WS_H */

@@ -33,7 +33,6 @@ unsigned char * base64_encode(const unsigned char *src, size_t len,
 	const unsigned char *end, *in;
 	size_t olen;
 	int line_len;
-	
 
 	olen = len * 4 / 3 + 4; /* 3-byte blocks to 4-byte */
 	olen += olen / 72; /* line feeds */

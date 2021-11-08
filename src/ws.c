@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2020  Davidson Francis <davidsondfgl@gmail.com>
+ * Copyright (C) 2016-2021  Davidson Francis <davidsondfgl@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,15 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
- 
- /*
- * pd-websocketserver modifications 
- * Copyright (c) 2021 Lucas Cordiviola <lucarda27@hotmail.com>
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
- */
- 
- 
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
 #include <fcntl.h>
@@ -33,24 +24,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <time.h>
 
-#ifdef _WIN32
+/* clang-format off */
+#ifndef _WIN32
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#else
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <time.h>
-#include <Windows.h>
+#include <windows.h>
+typedef int socklen_t;
+#endif
+/* clang-format on */
 
-	
-#else			
-#include <sys/socket.h>
-#include <arpa/inet.h>
+/* Windows and macOS seems to not have MSG_NOSIGNAL */
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
 #endif
 
+#include <unistd.h>
+
 #include <ws.h>
-
-
-
+#include <utf8.h>
 
 /**
  * @dir src/
@@ -77,6 +74,18 @@ struct ws_port
 {
 	int port_number;         /**< Port number.      */
 	struct ws_events events; /**< Websocket events. */
+};
+
+/**
+ * @brief ws_accept data.
+ *
+ * This defines a set of data that is used inside of each
+ * accept routine, whether by the main routine or not.
+ */
+struct ws_accept
+{
+	int sock;       /**< Socket number.               */
+	int port_index; /**< Port index in the port list. */
 };
 
 /**
@@ -158,14 +167,62 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
  *
  * @param s Error message.
  */
- 
- // lucarda changed to exit(0) from exit(-1); post("s") from perror(s);
 #define panic(s)   \
 	do             \
 	{              \
-		post("s"); \
-		exit(0);  \
+		perror(s); \
+		exit(-1);  \
 	} while (0);
+
+/**
+ * @brief Shutdown and close a given socket.
+ *
+ * @param fd Socket file descriptor to be closed.
+ *
+ * @attention This is part of the internal API and is documented just
+ * for completeness.
+ */
+static void close_socket(int fd)
+{
+#ifndef _WIN32
+	shutdown(fd, SHUT_RDWR);
+	close(fd);
+#else
+	closesocket(fd);
+#endif
+}
+
+/**
+ * @brief Send a given message @p buf on a socket @p sockfd.
+ *
+ * @param sockfd Target socket.
+ * @param buf Message to be sent.
+ * @param len Message length.
+ * @param flags Send flags.
+ *
+ * @return Returns 0 if success (i.e: all message was sent),
+ * -1 otherwise.
+ *
+ * @note Technically this shouldn't be necessary, since send() should
+ * block until all content is sent, since _we_ don't use 'O_NONBLOCK'.
+ * However, it was reported (issue #22 on GitHub) that this was
+ * happening, so just to be cautious, I will keep using this routine.
+ */
+static ssize_t send_all(int sockfd, const void *buf, size_t len, int flags)
+{
+	const char *p;
+	ssize_t ret;
+	p = buf;
+	while (len)
+	{
+		ret = send(sockfd, p, len, flags);
+		if (ret == -1)
+			return (-1);
+		p += ret;
+		len -= ret;
+	}
+	return (0);
+}
 
 /**
  * @brief For a given client @p fd, returns its
@@ -282,14 +339,7 @@ static void *close_timeout(void *p)
 
 	DEBUG("Timer expired, closing client %d\n", conn->client_sock);
 
-	#ifdef _WIN32
-	shutdown(conn->client_sock, SD_BOTH);
-	closesocket(conn->client_sock);
-	#else
-	shutdown(conn->client_sock, SHUT_RDWR);
-	close(conn->client_sock);
-	#endif
-	
+	close_socket(conn->client_sock);
 	conn->client_sock = -1;
 	conn->state       = WS_STATE_CLOSED;
 quit:
@@ -391,6 +441,7 @@ int ws_sendframe(int fd, const char *msg, uint64_t size, bool broadcast, int typ
 	uint64_t length;         /* Message length.    */
 	int idx_response;        /* Index response.    */
 	ssize_t output;          /* Bytes sent.        */
+	ssize_t send_ret;        /* Ret send function  */
 	int sock;                /* File Descript.     */
 	uint64_t i;              /* Loop index.        */
 	int cur_port_index;      /* Current port index */
@@ -449,8 +500,9 @@ int ws_sendframe(int fd, const char *msg, uint64_t size, bool broadcast, int typ
 	}
 
 	response[idx_response] = '\0';
-	output                 = send(CLI_SOCK(fd), response, idx_response,0);
-	if (broadcast)
+	output                 = SEND(fd, response, idx_response);
+
+	if (output != -1 && broadcast)
 	{
 		pthread_mutex_lock(&mutex);
 		cur_port_index = -1;
@@ -463,7 +515,15 @@ int ws_sendframe(int fd, const char *msg, uint64_t size, bool broadcast, int typ
 			sock = client_socks[i].client_sock;
 			if ((sock > -1) && (sock != fd) &&
 				(client_socks[i].port_index == cur_port_index))
-				output += send(CLI_SOCK(sock), response, idx_response,0);
+			{
+				if ((send_ret = SEND(sock, response, idx_response)) != -1)
+					output += send_ret;
+				else
+				{
+					output = -1;
+					break;
+				}
+			}
 		}
 		pthread_mutex_unlock(&mutex);
 	}
@@ -599,14 +659,14 @@ static inline int is_control_frame(int frame)
  * @attention This is part of the internal API and is documented just
  * for completeness.
  */
-static int do_handshake(struct ws_frame_data *wfd, int p_index, t_websocketserver *x)
+static int do_handshake(struct ws_frame_data *wfd, int p_index)
 {
 	char *response; /* Handshake response message. */
 	char *p;        /* Last request line pointer.  */
 	ssize_t n;      /* Read/Write bytes.           */
 
 	/* Read the very first client message. */
-	if ((n = recv(wfd->sock, wfd->frm, sizeof(wfd->frm) - 1,0)) < 0)
+	if ((n = RECV(wfd->sock, wfd->frm, sizeof(wfd->frm) - 1)) < 0)
 		return (-1);
 
 	/* Advance our pointers before the first next_byte(). */
@@ -634,7 +694,7 @@ static int do_handshake(struct ws_frame_data *wfd, int p_index, t_websocketserve
 		response);
 
 	/* Send handshake. */
-	if (send(CLI_SOCK(wfd->sock), response, strlen(response),0) < 0)
+	if (SEND(wfd->sock, response, strlen(response)) < 0)
 	{
 		free(response);
 		DEBUG("As error has occurred while handshaking!\n");
@@ -642,7 +702,7 @@ static int do_handshake(struct ws_frame_data *wfd, int p_index, t_websocketserve
 	}
 
 	/* Trigger events and clean up buffers. */
-	ports[p_index].events.onopen(CLI_SOCK(wfd->sock), x);
+	ports[p_index].events.onopen(CLI_SOCK(wfd->sock));
 	free(response);
 	return (0);
 }
@@ -755,7 +815,7 @@ static inline int next_byte(struct ws_frame_data *wfd)
 	/* If empty or full. */
 	if (wfd->cur_pos == 0 || wfd->cur_pos == wfd->amt_read)
 	{
-		if ((n = recv(wfd->sock, wfd->frm, sizeof(wfd->frm),0)) <= 0)
+		if ((n = RECV(wfd->sock, wfd->frm, sizeof(wfd->frm))) <= 0)
 		{
 			wfd->error = 1;
 			DEBUG("An error has occurred while trying to read next byte\n");
@@ -967,6 +1027,7 @@ static int next_frame(struct ws_frame_data *wfd, int idx)
 	uint64_t msg_idx_ctrl;   /* Current msg index.         */
 	uint64_t frame_length;   /* Frame length.              */
 	uint64_t frame_size;     /* Current frame size.        */
+	uint32_t utf8_state;     /* Current UTF-8 state.       */
 	uint8_t opcode;          /* Frame opcode.              */
 	uint8_t is_fin;          /* Is FIN frame flag.         */
 	uint8_t mask;            /* Mask.                      */
@@ -982,6 +1043,7 @@ static int next_frame(struct ws_frame_data *wfd, int idx)
 	wfd->frame_size = 0;
 	wfd->frame_type = -1;
 	wfd->msg        = NULL;
+	utf8_state      = UTF8_ACCEPT;
 
 	/* Read until find a FIN or a unsupported frame. */
 	do
@@ -1088,6 +1150,40 @@ static int next_frame(struct ws_frame_data *wfd, int idx)
 			{
 				read_frame(wfd, opcode, &msg_data, &frame_length, &wfd->frame_size,
 					&msg_idx_data, masks_data, is_fin);
+
+#ifdef VALIDATE_UTF8
+				/* UTF-8 Validate partial (or not) frame. */
+				if (wfd->frame_type == WS_FR_OP_TXT)
+				{
+					if (is_fin)
+					{
+						if (is_utf8_len_state(
+								msg_data + (msg_idx_data - frame_length),
+								frame_length, utf8_state) != UTF8_ACCEPT)
+						{
+							DEBUG("Dropping invalid complete message!\n");
+							wfd->error = 1;
+							do_close(wfd, WS_CLSE_INVUTF8);
+						}
+					}
+
+					/* Check current state for a CONT or initial TXT frame. */
+					else
+					{
+						utf8_state = is_utf8_len_state(
+							msg_data + (msg_idx_data - frame_length), frame_length,
+							utf8_state);
+
+						/* We can be in any state, except reject. */
+						if (utf8_state == UTF8_REJECT)
+						{
+							DEBUG("Dropping invalid cont/initial frame!\n");
+							wfd->error = 1;
+							do_close(wfd, WS_CLSE_INVUTF8);
+						}
+					}
+				}
+#endif
 			}
 
 			/*
@@ -1125,6 +1221,16 @@ static int next_frame(struct ws_frame_data *wfd, int idx)
 				if (read_frame(wfd, opcode, &msg_ctrl, &frame_length, &frame_size,
 						&msg_idx_ctrl, masks_ctrl, is_fin) < 0)
 					break;
+
+#ifdef VALIDATE_UTF8
+				/* If there is a close reason, check if it is UTF-8 valid. */
+				if (frame_size > 2 && !is_utf8_len(msg_ctrl + 2, frame_size - 2))
+				{
+					DEBUG("Invalid close frame payload reason! (not UTF-8)\n");
+					wfd->error = 1;
+					break;
+				}
+#endif
 
 				/* Since we're aborting, we can scratch the 'data'-related
 				 * vars here. */
@@ -1164,25 +1270,22 @@ static int next_frame(struct ws_frame_data *wfd, int idx)
  *
  * @param vsock Client connection index.
  *
- * @return Returns @p vsock if success and a negative
- * number otherwise.
+ * @return Returns @p vsock.
  *
  * @note This will be run on a different thread.
  *
  * @attention This is part of the internal API and is documented just
  * for completeness.
  */
-static void *ws_establishconnection(t_websocketserver *x)
+static void *ws_establishconnection(void *vsock)
 {
 	struct ws_frame_data wfd; /* WebSocket frame data.   */
 	int connection_index;     /* Client connect. index.  */
-	int close_frame;          /* Close frame flag.       */
 	int clse_thrd;            /* Time-out close thread.  */
 	int p_index;              /* Port list index.        */
 	int sock;                 /* File descriptor.        */
 
-	close_frame      = 0;
-	connection_index = x->connection_index;
+	connection_index = (int)(intptr_t)vsock;
 	sock             = client_socks[connection_index].client_sock;
 	p_index          = client_socks[connection_index].port_index;
 
@@ -1191,7 +1294,7 @@ static void *ws_establishconnection(t_websocketserver *x)
 	wfd.sock = sock;
 
 	/* Do handshake. */
-	if (do_handshake(&wfd, p_index, x) < 0)
+	if (do_handshake(&wfd, p_index) < 0)
 		goto closed;
 
 	/* Change state. */
@@ -1205,13 +1308,12 @@ static void *ws_establishconnection(t_websocketserver *x)
 			!wfd.error)
 		{
 			ports[p_index].events.onmessage(
-				sock, wfd.msg, wfd.frame_size, wfd.frame_type, x);
+				sock, wfd.msg, wfd.frame_size, wfd.frame_type);
 		}
 
 		/* Close event. */
 		else if (wfd.frame_type == WS_FR_OP_CLSE && !wfd.error)
 		{
-			close_frame = 1;
 
 			/*
 			 * We only send a CLOSE frame once, if we're already
@@ -1222,15 +1324,10 @@ static void *ws_establishconnection(t_websocketserver *x)
 				set_client_state(connection_index, WS_STATE_CLOSING);
 
 				/* We only send a close frameSend close frame */
-				if (do_close(&wfd, -1) < 0)
-					break;
+				do_close(&wfd, -1);
 			}
 
-			/*
-			 * on_close events always occur, whether for client
-			 * closure or server closure.
-			 */
-			ports[p_index].events.onclose(sock, x);
+			free(wfd.msg);
 			break;
 		}
 
@@ -1238,12 +1335,11 @@ static void *ws_establishconnection(t_websocketserver *x)
 	}
 
 	/*
-	 * If we do not receive a close frame, we still need to
-	 * call the close event, as the server is expected to
+	 * on_close events always occur, whether for client closure
+	 * or server closure, as the server is expected to
 	 * always know when the client disconnects.
 	 */
-	if (!close_frame)
-		ports[p_index].events.onclose(sock, x);
+	ports[p_index].events.onclose(sock);
 
 closed:
 	pthread_mutex_lock(&client_socks[connection_index].mtx_state);
@@ -1254,11 +1350,7 @@ closed:
 		/* Removes client socket from socks list. */
 		client_socks[connection_index].client_sock = -1;
 		client_socks[connection_index].state       = WS_STATE_CLOSED;
-		#ifdef _WIN32
-		closesocket(sock);
-		#else
-		close(sock);
-		#endif
+		close_socket(sock);
 		pthread_cond_signal(&client_socks[connection_index].cnd_state_close);
 	}
 
@@ -1272,125 +1364,44 @@ closed:
 	pthread_cond_destroy(&client_socks[connection_index].cnd_state_close);
 	pthread_mutex_destroy(&client_socks[connection_index].mtx_state);
 	client_socks[connection_index].close_thrd = false;
-	return (x->connection_index);
+	return (vsock);
 }
 
 /**
- * @brief Main loop for the server.
+ * @brief Main loop that keeps accepting new connections.
  *
- * @param evs  Events structure.
- * @param port Server port.
+ * @param data Accept thread data: sock and port index.
  *
- * @return This function never returns.
+ * @return Returns @p data.
  *
- * @note Note that this function can be called multiples times,
- * from multiples different threads (depending on the @ref MAX_PORTS)
- * value. Each call _should_ have a different port and can have
- * different events configured.
+ * @note This may be run on a different thread.
+ *
+ * @attention This is part of the internal API and is documented just
+ * for completeness.
  */
-int ws_socket(struct ws_events *evs, t_websocketserver *x)
+static void *ws_accept(void *data)
 {
-	int sock;                  /* Current socket.        */
-	int new_sock;              /* New opened connection. */
-	struct sockaddr_in server; /* Server.                */
-	struct sockaddr_in client; /* Client.                */
-	int len;                   /* Length of sockaddr.    */
-	pthread_t client_thread;   /* Client thread.         */
-	int i;                     /* Loop index.            */
-	int connection_index;
-	int p_index;
-	
-	
-	#ifdef _WIN32
-	
-	WSADATA wsa;
-	if (WSAStartup(MAKEWORD(2,2),&wsa) != 0)
-	{
-		printf("Failed. Error Code : %d",WSAGetLastError());		
-	}
-	
-	#endif
+	struct ws_accept *accept_data; /* Accept thread data.    */
+	struct sockaddr_in client;     /* Client.                */
+	pthread_t client_thread;       /* Client thread.         */
+	int connection_index;          /* Free connection slot.  */
+	int new_sock;                  /* New opened connection. */
+	int len;                       /* Length of sockaddr.    */
+	int i;                         /* Loop index.            */
 
 	connection_index = 0;
+	accept_data      = data;
+	len              = sizeof(struct sockaddr_in);
 
-	/* Checks if the event list is a valid pointer. */
-	if (evs == NULL)
-		panic("Invalid event list!");
-
-	pthread_mutex_lock(&mutex);
-	if (port_index >= MAX_PORTS)
-	{
-		pthread_mutex_unlock(&mutex);
-		panic("too much websocket ports opened !");
-	}
-	p_index = port_index;
-	port_index++;
-	pthread_mutex_unlock(&mutex);
-
-	/* Copy events. */
-	memcpy(&ports[p_index].events, evs, sizeof(struct ws_events));
-//orig ports[p_index].port_number = port;
-	ports[p_index].port_number = x->pd_port;
-	
-	
-	/* Create socket. */
-	sock = socket(AF_INET, SOCK_STREAM , 0);
-	x->intersocket = sock;
-	
-	
-	if (sock < 0)
-		panic("Could not create socket");
-
-	/* Reuse previous address. */ 
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0)
-		panic("setsockopt(SO_REUSEADDR) failed");
-	
-
-
-	/* Prepare the sockaddr_in structure. */
-	server.sin_family      = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
-//orig server.sin_port        = htons(port);
-	server.sin_port        = htons(x->pd_port);
-
-	/* Bind. */
-	if (bind(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
-		panic("Bind failed");
-
-	/* Listen. */
-	listen(sock, MAX_CLIENTS);
-
-	/* Wait for incoming connections. */
-	logpost(x,2,"websocket port: %d waiting for incoming connections...", x->pd_port);
-	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
-	SETFLOAT(&x->serverstatus[1], 1);
-	outlet_list(x->list_out2, NULL, 2, x->serverstatus);
-	
-	
-	len = sizeof(struct sockaddr_in);
-	memset(client_socks, -1, sizeof(client_socks));
-
-	/* Accept connections. */ 
 	while (1)
 	{
 		/* Accept. */
-		
-		new_sock = accept(sock, (struct sockaddr *)&client, (socklen_t *)&len);
-		
-		
-		/*
+		new_sock =
+			accept(accept_data->sock, (struct sockaddr *)&client, (socklen_t *)&len);
+
 		if (new_sock < 0)
 			panic("Error on accepting connections..");
-		*/
-		if (new_sock < 0) {
-			
-				#ifdef _WIN32
-				closesocket(new_sock);
-				#else
-				close(new_sock);
-				#endif
-				break;
-				}
+
 		/* Adds client socket to socks list. */
 		pthread_mutex_lock(&mutex);
 		for (i = 0; i < MAX_CLIENTS; i++)
@@ -1398,11 +1409,10 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 			if (client_socks[i].client_sock == -1)
 			{
 				client_socks[i].client_sock = new_sock;
-				client_socks[i].port_index  = p_index;
+				client_socks[i].port_index  = accept_data->port_index;
 				client_socks[i].state       = WS_STATE_CONNECTING;
 				client_socks[i].close_thrd  = false;
-// orig connection_index            = i;
-				x->connection_index = i;
+				connection_index            = i;
 
 				if (pthread_mutex_init(&client_socks[i].mtx_state, NULL))
 					panic("Error on allocating close mutex");
@@ -1412,32 +1422,129 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 			}
 		}
 		pthread_mutex_unlock(&mutex);
-		
+
 		/* Client socket added to socks list ? */
 		if (i != MAX_CLIENTS)
 		{
 			if (pthread_create(&client_thread, NULL, ws_establishconnection,
-				x))
-			panic("Could not create the client thread!");
+					(void *)(intptr_t)connection_index))
+				panic("Could not create the client thread!");
 
 			pthread_detach(client_thread);
-		} else {
-				#ifdef _WIN32
-				closesocket(new_sock);
-				#else
-				close(new_sock);
-				#endif
-				break;
-			}
-		
-	} 
-	sleep(2);
-	logpost(x,2,"websocket port: %d closed.", x->pd_port);
-	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
-	SETFLOAT(&x->serverstatus[1], 0);
-	outlet_list(x->list_out2, NULL, 2, x->serverstatus);
-	pthread_exit(NULL);
-	//return (0);
+		}
+		else
+			close_socket(new_sock);
+	}
+	free(data);
+	return (data);
+}
+
+/**
+ * @brief Main loop for the server.
+ *
+ * @param evs  Events structure.
+ * @param port Server port.
+ * @param thread_loop If any value other than zero, runs
+ *                    the accept loop in another thread
+ *                    and immediately returns. If 0, runs
+ *                    in the same thread and blocks execution.
+ *
+ * @return If @p thread_loop != 0, returns 0. Otherwise, never
+ * returns.
+ *
+ * @note Note that this function can be called multiples times,
+ * from multiples different threads (depending on the @ref MAX_PORTS)
+ * value. Each call _should_ have a different port and can have
+ * different events configured.
+ */
+int ws_socket(struct ws_events *evs, uint16_t port, int thread_loop)
+{
+	struct ws_accept *accept_data; /* Accept thread data.    */
+	struct sockaddr_in server;     /* Server.                */
+	pthread_t accept_thread;       /* Accept thread.         */
+	int reuse;                     /* Socket option.         */
+
+	/* Checks if the event list is a valid pointer. */
+	if (evs == NULL)
+		panic("Invalid event list!");
+
+	/* Allocates our accept data. */
+	accept_data = malloc(sizeof(*accept_data));
+	if (!accept_data)
+		panic("Cannot allocate accept data, out of memory!\n");
+
+	pthread_mutex_lock(&mutex);
+	if (port_index >= MAX_PORTS)
+	{
+		pthread_mutex_unlock(&mutex);
+		panic("too much websocket ports opened !");
+	}
+	accept_data->port_index = port_index;
+	port_index++;
+	pthread_mutex_unlock(&mutex);
+
+	/* Copy events. */
+	memcpy(&ports[accept_data->port_index].events, evs, sizeof(struct ws_events));
+	ports[accept_data->port_index].port_number = port;
+
+#ifdef _WIN32
+	WSADATA wsaData;
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+		panic("WSAStartup failed!");
+
+	/**
+	 * Sets stdout to be non-buffered.
+	 *
+	 * According to the docs from MSDN (setvbuf page), Windows do not
+	 * really supports line buffering but full-buffering instead.
+	 *
+	 * Quote from the docs:
+	 * "... _IOLBF For some systems, this provides line buffering.
+	 *  However, for Win32, the behavior is the same as _IOFBF"
+	 */
+	setvbuf(stdout, NULL, _IONBF, 0);
+#endif
+
+	/* Create socket. */
+	accept_data->sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (accept_data->sock < 0)
+		panic("Could not create socket");
+
+	/* Reuse previous address. */
+	reuse = 1;
+	if (setsockopt(accept_data->sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&reuse,
+			sizeof(reuse)) < 0)
+	{
+		panic("setsockopt(SO_REUSEADDR) failed");
+	}
+
+	/* Prepare the sockaddr_in structure. */
+	server.sin_family      = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port        = htons(port);
+
+	/* Bind. */
+	if (bind(accept_data->sock, (struct sockaddr *)&server, sizeof(server)) < 0)
+		panic("Bind failed");
+
+	/* Listen. */
+	listen(accept_data->sock, MAX_CLIENTS);
+
+	/* Wait for incoming connections. */
+	printf("Waiting for incoming connections...\n");
+	memset(client_socks, -1, sizeof(client_socks));
+
+	/* Accept connections. */
+	if (!thread_loop)
+		ws_accept(accept_data);
+	else
+	{
+		if (pthread_create(&accept_thread, NULL, ws_accept, accept_data))
+			panic("Could not create the client thread!");
+		pthread_detach(accept_thread);
+	}
+
+	return (0);
 }
 
 #ifdef AFL_FUZZ
@@ -1476,10 +1583,16 @@ int ws_file(struct ws_events *evs, const char *file)
 	/* Set client settings. */
 	client_socks[0].client_sock = sock;
 	client_socks[0].port_index  = 0;
+	client_socks[0].state       = WS_STATE_CONNECTING;
+	client_socks[0].close_thrd  = false;
+
+	/* Initialize mutexes. */
+	if (pthread_mutex_init(&client_socks[0].mtx_state, NULL))
+		panic("Error on allocating close mutex");
+	if (pthread_cond_init(&client_socks[0].cnd_state_close, NULL))
+		panic("Error on allocating condition var\n");
 
 	ws_establishconnection((void *)(intptr_t)0);
 	return (0);
 }
 #endif
-
-
