@@ -15,6 +15,7 @@ websocketserver.class.sources = \
 	./src/base64/base64.c \
 	./src/handshake/handshake.c \
 	./src/sha1/sha1.c \
+	./src/utf8/utf8.c \
 	./src/ws.c  \
 	./src/pd_websocket.c \
 

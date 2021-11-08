@@ -167,11 +167,12 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
  *
  * @param s Error message.
  */
+ // lucarda changed to exit(0) from exit(-1); post("s") from perror(s);
 #define panic(s)   \
 	do             \
 	{              \
-		perror(s); \
-		exit(-1);  \
+		perror("s"); \
+		exit(0);  \
 	} while (0);
 
 /**
