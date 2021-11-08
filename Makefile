@@ -4,6 +4,12 @@ lib.name = websocketserver
 cflags = -I ./include 
 ldlibs += -lpthread 
 
+WINARCH := $(shell $(CC) -dumpmachine)
+ifeq (i686% , $(WINARCH))
+	arch = m_i386
+else
+	arch = m_amd64
+endif
 
 websocketserver.class.sources = \
 	./src/base64/base64.c \
@@ -23,7 +29,7 @@ datafiles = \
 
 define forWindows
   ldlibs = -lws2_32 
-  datafiles += scripts/localdeps.win.sh scripts/windep.sh  
+  datafiles += scripts/localdeps.win.sh 
 endef
 
 # -static 
@@ -38,5 +44,8 @@ PDLIBBUILDER_DIR=./pd-lib-builder
 include $(PDLIBBUILDER_DIR)/Makefile.pdlibbuilder
 
 localdep_windows: install
-	cd "${installpath}"; ./windep.sh websocketserver.dll
+	cd "${installpath}"; ./localdeps.win.sh websocketserver.dll; \
+	mv websocketserver.dll websocketserver.$(arch); \
+	rm ./localdeps.win.sh \
+	
 	
