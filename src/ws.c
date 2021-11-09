@@ -171,7 +171,7 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #define panic(s)   \
 	do             \
 	{              \
-		perror("s"); \
+		post("s"); \
 		exit(0);  \
 	} while (0);
 
@@ -1385,12 +1385,12 @@ static void *ws_accept(t_websocketserver *x)
 	//struct ws_accept *accept_data; /* Accept thread data.    */
 	struct sockaddr_in client;     /* Client.                */
 	pthread_t client_thread;       /* Client thread.         */
-	int connection_index;          /* Free connection slot.  */
+	//int connection_index;          /* Free connection slot.  */
 	int new_sock;                  /* New opened connection. */
 	int len;                       /* Length of sockaddr.    */
 	int i;                         /* Loop index.            */
 
-	connection_index = 0;
+	//connection_index = 0;
 	//accept_data      = data;
 	len              = sizeof(struct sockaddr_in);
 
@@ -1470,7 +1470,7 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 {
 	//struct ws_accept *accept_data; /* Accept thread data.    */
 	struct sockaddr_in server;     /* Server.                */
-	pthread_t accept_thread;       /* Accept thread.         */
+	//pthread_t accept_thread;       /* Accept thread.         */
 	int reuse;                     /* Socket option.         */
 	int thread_loop = 0;
 
@@ -1543,7 +1543,6 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 	/* Wait for incoming connections. */
 	//printf("Waiting for incoming connections...\n");
 	memset(client_socks, -1, sizeof(client_socks));
-	/* Wait for incoming connections. */
 	logpost(x,2,"websocket port: %d waiting for incoming connections...", x->pd_port);
 	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
 	SETFLOAT(&x->serverstatus[1], 1);
