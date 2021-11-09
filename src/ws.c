@@ -14,6 +14,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
+ 
+ /*
+ * pd-websocketserver modifications 
+ * Copyright (c) 2021 Lucas Cordiviola <lucarda27@hotmail.com>
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+ 
+ 
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
 #include <fcntl.h>
