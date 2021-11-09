@@ -1401,8 +1401,10 @@ static void *ws_accept(t_websocketserver *x)
 			accept(x->sock, (struct sockaddr *)&client, (socklen_t *)&len);
 
 		if (new_sock < 0)
-			panic("Error on accepting connections..");
-
+		{
+			close_socket(new_sock);
+			break;
+		}
 		/* Adds client socket to socks list. */
 		pthread_mutex_lock(&mutex);
 		for (i = 0; i < MAX_CLIENTS; i++)
@@ -1416,27 +1418,34 @@ static void *ws_accept(t_websocketserver *x)
 				x->connection_index            = i;
 
 				if (pthread_mutex_init(&client_socks[i].mtx_state, NULL))
-					panic("Error on allocating close mutex");
+					post("Error on allocating close mutex");
 				if (pthread_cond_init(&client_socks[i].cnd_state_close, NULL))
-					panic("Error on allocating condition var\n");
+					post("Error on allocating condition var\n");
 				break;
 			}
 		}
 		pthread_mutex_unlock(&mutex);
-
 		/* Client socket added to socks list ? */
 		if (i != MAX_CLIENTS)
 		{
 			if (pthread_create(&client_thread, NULL, ws_establishconnection, x))
-				panic("Could not create the client thread!");
+				post("Could not create the client thread!");
 
 			pthread_detach(client_thread);
-		}
-		else
+		} else {
 			close_socket(new_sock);
+			post("closesocket");
+			break;
+		}
 	}
+	sleep(2);
+	logpost(x,2,"websocket port: %d closed.", x->pd_port);
+	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
+	SETFLOAT(&x->serverstatus[1], 0);
+	outlet_list(x->list_out2, NULL, 2, x->serverstatus);
+	pthread_exit(NULL);
 	//free(data);
-	return;
+	//return;
 }
 
 /**
@@ -1463,7 +1472,7 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 	struct sockaddr_in server;     /* Server.                */
 	pthread_t accept_thread;       /* Accept thread.         */
 	int reuse;                     /* Socket option.         */
-	int thread_loop = 1;
+	int thread_loop = 0;
 
 	/* Checks if the event list is a valid pointer. */
 	if (evs == NULL)
@@ -1532,29 +1541,27 @@ int ws_socket(struct ws_events *evs, t_websocketserver *x)
 	listen(x->sock, MAX_CLIENTS);
 
 	/* Wait for incoming connections. */
-	printf("Waiting for incoming connections...\n");
+	//printf("Waiting for incoming connections...\n");
 	memset(client_socks, -1, sizeof(client_socks));
+	/* Wait for incoming connections. */
+	logpost(x,2,"websocket port: %d waiting for incoming connections...", x->pd_port);
+	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
+	SETFLOAT(&x->serverstatus[1], 1);
+	outlet_list(x->list_out2, NULL, 2, x->serverstatus);
 
 	/* Accept connections. */
-	if (!thread_loop)
-		printf("hello");//ws_accept(accept_data);
+	if (!thread_loop) {
+		ws_accept(x);
+	}
 	else 
 	{
-		if (pthread_create(&accept_thread, NULL, ws_accept, x))
-			panic("Could not create the client thread!");
-		pthread_detach(accept_thread);
-	
-
-	sleep(2);
-	logpost(x,2,"websocket port: %d closed.", x->pd_port);
-	SETSYMBOL(&x->serverstatus[0], gensym("server-running"));
-	SETFLOAT(&x->serverstatus[1], 0);
-	outlet_list(x->list_out2, NULL, 2, x->serverstatus);
-	pthread_exit(NULL);
+		//if (pthread_create(&accept_thread, NULL, ws_accept, x))
+		//	panic("Could not create the client thread!");
+		//pthread_detach(accept_thread);
 	
 	}
 
-	return (0);
+	//return (0);
 }
 
 #ifdef AFL_FUZZ
