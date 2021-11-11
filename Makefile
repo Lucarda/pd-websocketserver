@@ -33,14 +33,11 @@ define forWindows
   datafiles += scripts/localdeps.win.sh 
 endef
 
-# -static 
-
-
-
 
 # include Makefile.pdlibbuilder
 # (for real-world projects see the "Project Management" section
 # in tips-tricks.md)
+
 PDLIBBUILDER_DIR=./pd-lib-builder
 include $(PDLIBBUILDER_DIR)/Makefile.pdlibbuilder
 
