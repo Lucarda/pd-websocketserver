@@ -270,7 +270,6 @@ static void fudiparse_binbuf(t_websocketserver *x, const unsigned char *amsg)
 static void fudi_any (t_websocketserver *x, t_symbol*s, int argc, t_atom*argv) {
   char *buf;
   int length;
-  int i;
   t_atom at;
   t_binbuf*bbuf = binbuf_new();
   

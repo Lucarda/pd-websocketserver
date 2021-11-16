@@ -70,8 +70,7 @@ typedef struct _websocketserver {
   t_atom *x_atoms;
   size_t x_numatoms;
   int verbosity;
-  t_atom serverstatus[2];
-  
+  t_atom serverstatus[2];  
   int port_index;
   int sock;
   
