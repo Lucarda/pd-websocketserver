@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2020  Davidson Francis <davidsondfgl@gmail.com>
+ * Copyright (C) 2016-2021  Davidson Francis <davidsondfgl@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,10 +32,14 @@
 #ifndef WS_H
 #define WS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 	#include <stdbool.h>
 	#include <stdint.h>
 	#include <inttypes.h>
-	
+
 	/**
 	 * @name Global configurations
 	 */
@@ -44,8 +48,6 @@
 	 * @brief Max clients connected simultaneously.
 	 */
 	#define MAX_CLIENTS    64 // 8
-	
-
 	
 /////// Pd ////// 
 
@@ -68,13 +70,15 @@ typedef struct _websocketserver {
   t_atom *x_atoms;
   size_t x_numatoms;
   int verbosity;
-  t_atom serverstatus[2];
+  t_atom serverstatus[2];  
+  int port_index;
+  int sock;
   
 } t_websocketserver;
 	
 /////// end Pd //////
-
-
+	
+	
 
 	/**
 	 * @brief Max number of `ws_server` instances running
@@ -200,6 +204,10 @@ typedef struct _websocketserver {
 	 */
 	#define WS_CLSE_PROTERR 1002
 	/**@}*/
+	/**
+	 * @brief Inconsistent message (invalid utf-8)
+	 */
+	#define WS_CLSE_INVUTF8 1007
 
 	/**
 	 * @name Connection states
@@ -253,8 +261,12 @@ typedef struct _websocketserver {
 
 	#ifndef AFL_FUZZ
 	#define CLI_SOCK(sock) (sock)
+	#define SEND(fd,buf,len) send_all((fd), (buf), (len), MSG_NOSIGNAL)
+	#define RECV(fd,buf,len) recv((fd), (buf), (len), 0)
 	#else
 	#define CLI_SOCK(sock) (fileno(stdout))
+	#define SEND(fd,buf,len) write(fileno(stdout), (buf), (len))
+	#define RECV(fd,buf,len) read((fd), (buf), (len))
 	#endif
 
 	/**
@@ -277,7 +289,6 @@ typedef struct _websocketserver {
 		 * or binary message.
 		 */
 		void (*onmessage)(int, const unsigned char *, uint64_t, int, t_websocketserver *x);
-		
 	};
 
 	/* Forward declarations. */
@@ -291,13 +302,14 @@ typedef struct _websocketserver {
 		bool broadcast);
 	extern int ws_get_state(int fd);
 	extern int ws_close_client(int fd);
-// orig extern int ws_socket(struct ws_events *evs, uint16_t port);
 	extern int ws_socket(struct ws_events *evs, t_websocketserver *x);
 
 #ifdef AFL_FUZZ
 	extern int ws_file(struct ws_events *evs, const char *file);
 #endif
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* WS_H */

@@ -270,7 +270,6 @@ static void fudiparse_binbuf(t_websocketserver *x, const unsigned char *amsg)
 static void fudi_any (t_websocketserver *x, t_symbol*s, int argc, t_atom*argv) {
   char *buf;
   int length;
-  int i;
   t_atom at;
   t_binbuf*bbuf = binbuf_new();
   
@@ -344,15 +343,14 @@ static void websocketserver_disconnect(t_websocketserver *x) {
 
 	
 	#ifdef _WIN32
-			
-		
-		shutdown(x->intersocket, SD_BOTH);
-		closesocket(x->intersocket);
+	
+		shutdown(x->sock, SD_BOTH);
+		closesocket(x->sock);
 		
 	#else
 		
-		shutdown(x->intersocket, SHUT_RDWR);
-		close(x->intersocket);	
+		shutdown(x->sock, SHUT_RDWR);
+		close(x->sock);	
 	#endif
 	
 	pthread_join(x->tid, NULL);

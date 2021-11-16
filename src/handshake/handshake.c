@@ -64,9 +64,8 @@ int get_handshake_accept(char *wsKey, unsigned char **dest)
 	SHA1Reset(&ctx);
 	SHA1Input(&ctx, (const uint8_t *)str, WS_KEYMS_LEN);
 	SHA1Result(&ctx, hash);
-	
 
-	*dest = base64_encode(hash, SHA1HashSize, NULL);
+	*dest = base64_encodee(hash, SHA1HashSize, NULL);
 	*(*dest + strlen((const char *)*dest) - 1) = '\0';
 	free(str);
 	return (0);
