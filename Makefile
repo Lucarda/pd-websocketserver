@@ -5,7 +5,7 @@ cflags = -I ./include
 ldlibs += -lpthread 
 
 WINARCH := $(shell $(CC) -dumpmachine)
-ifeq (i686% , $(WINARCH))
+ifneq ($(filter i686%, $(WINARCH)),)
 	arch = m_i386
 else
 	arch = m_amd64
