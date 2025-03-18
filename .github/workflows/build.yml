@@ -73,16 +73,21 @@ jobs:
           brew update
           brew install --cask pd
           ls -la /Applications/Pd-*.app/Contents/Resources/
-          mkdir -p /usr/local/include/pd
-          # Copy header files to a standard location
-          sudo cp -r /Applications/Pd-*.app/Contents/Resources/src/*.h /usr/local/include/pd/
+
+      - name: Setup PD include directory
+        run: |
+          # Create include directory in user's home directory
+          mkdir -p $HOME/pd_include
+          # Copy header files to our include location
+          cp -r /Applications/Pd-*.app/Contents/Resources/src/*.h $HOME/pd_include/
+          ls -la $HOME/pd_include/
 
       - name: Build pd-websocketserver
         run: |
           # Find pd installation
           PD_APP=$(find /Applications -name "Pd-*.app" | head -1)
           echo "Found PD at: $PD_APP"
-          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L$PD_APP/Contents/Resources/bin"
+          make CFLAGS="-I$HOME/pd_include" LDFLAGS="-L$PD_APP/Contents/Resources/bin"
         env:
           CC: "ccache gcc"
 
@@ -121,16 +126,21 @@ jobs:
           brew update
           brew install --cask pd
           ls -la /Applications/Pd-*.app/Contents/Resources/
-          mkdir -p /usr/local/include/pd
-          # Copy header files to a standard location
-          sudo cp -r /Applications/Pd-*.app/Contents/Resources/src/*.h /usr/local/include/pd/
+
+      - name: Setup PD include directory
+        run: |
+          # Create include directory in user's home directory
+          mkdir -p $HOME/pd_include
+          # Copy header files to our include location
+          cp -r /Applications/Pd-*.app/Contents/Resources/src/*.h $HOME/pd_include/
+          ls -la $HOME/pd_include/
 
       - name: Build pd-websocketserver for ARM
         run: |
           # Find pd installation
           PD_APP=$(find /Applications -name "Pd-*.app" | head -1)
           echo "Found PD at: $PD_APP"
-          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L$PD_APP/Contents/Resources/bin -arch arm64"
+          make CFLAGS="-I$HOME/pd_include -arch arm64" LDFLAGS="-L$PD_APP/Contents/Resources/bin -arch arm64"
         env:
           CC: "ccache gcc"
 
