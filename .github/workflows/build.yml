@@ -9,122 +9,257 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+env:
+  PD_VERSION: 0.54-1
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            platform: linux
-            extension: pd_linux
-          - os: macos-latest
-            platform: macos
-            extension: pd_darwin
-          - os: windows-latest
-            platform: windows
-            extension: dll
-    
-    runs-on: ${{ matrix.os }}
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    
-    - name: Install dependencies (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y puredata-dev build-essential
-
-    - name: Build (Linux)
-      if: matrix.platform == 'linux'
-      run: make
-
-    - name: Install dependencies (macOS)
-      if: matrix.platform == 'macos'
-      run: |
-        brew install pure-data
-
-    - name: Build (macOS)
-      if: matrix.platform == 'macos'
-      run: make
-
-    - name: Setup MSYS2 (Windows)
-      if: matrix.platform == 'windows'
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc 
-          make
-
-    - name: Build (Windows)
-      if: matrix.platform == 'windows'
-      shell: msys2 {0}
-      run: |
-        make
-        make localdep_windows
-
-    - name: Create artifacts directory
-      run: mkdir -p artifacts
-
-    - name: Find and copy artifacts (Linux/macOS) 
-      if: matrix.platform != 'windows'
-      run: |
-        # Copy the main binary
-        find . -name "websocketserver*.${EXTENSION}" -exec cp {} artifacts/ \;
-        # Copy supporting files
-        cp -f websocketserver-help.pd artifacts/ || true
-        cp -f send_receive.html artifacts/ || true
-        cp -f LICENSE artifacts/ || true
-        cp -f README.md artifacts/ || true
-        cp -f CHANGELOG.txt artifacts/ || true
-      shell: bash
-      env:
-        EXTENSION: ${{ matrix.extension }}
-
-    - name: Find and copy artifacts (Windows)
-      if: matrix.platform == 'windows'
-      shell: bash
-      run: |
-        # Copy the main binaries
-        find . -name "websocketserver*.dll" -exec cp {} artifacts/ \; || true
-        find . -name "websocketserver*.m_*" -exec cp {} artifacts/ \; || true
-        # Copy supporting files
-        cp -f websocketserver-help.pd artifacts/ || true
-        cp -f send_receive.html artifacts/ || true
-        cp -f LICENSE artifacts/ || true
-        cp -f README.md artifacts/ || true
-        cp -f CHANGELOG.txt artifacts/ || true
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: websocketserver-${{ matrix.platform }}
-        path: artifacts/
-
-  create-release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+  # ===============================================================
+  Linux-Build:
     runs-on: ubuntu-latest
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-linux
 
-    - name: Zip artifacts
-      run: |
-        zip -r websocketserver-linux.zip websocketserver-linux/
-        zip -r websocketserver-macos.zip websocketserver-macos/
-        zip -r websocketserver-windows.zip websocketserver-windows/
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential puredata-dev
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          websocketserver-linux.zip
-          websocketserver-macos.zip
-          websocketserver-windows.zip
-        draft: true
+      - name: Build pd-websocketserver
+        run: make
+        env:
+          CC: "ccache gcc"
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          find . -name "websocketserver*.pd_linux" -exec cp {} artifacts/ \;
+          cp -f websocketserver-help.pd artifacts/ || true
+          cp -f send_receive.html artifacts/ || true
+          cp -f LICENSE artifacts/ || true
+          cp -f README.md artifacts/ || true
+          cp -f CHANGELOG.txt artifacts/ || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: websocketserver-linux
+          path: artifacts/
+
+  # ===============================================================
+  macOS-Intel-Build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-macos-intel
+
+      - name: Install Pure Data
+        run: |
+          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
+          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz
+          sudo mv Pd-${{ env.PD_VERSION }}.app /Applications/
+          sudo mkdir -p /usr/local/include/pd
+          sudo ln -s /Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/src/*.h /usr/local/include/pd/
+
+      - name: Build pd-websocketserver
+        run: |
+          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L/Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/bin"
+        env:
+          CC: "ccache gcc"
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          find . -name "websocketserver*.pd_darwin" -exec cp {} artifacts/ \;
+          cp -f websocketserver-help.pd artifacts/ || true
+          cp -f send_receive.html artifacts/ || true
+          cp -f LICENSE artifacts/ || true
+          cp -f README.md artifacts/ || true
+          cp -f CHANGELOG.txt artifacts/ || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: websocketserver-macos-intel
+          path: artifacts/
+
+  # ===============================================================
+  macOS-ARM-Build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-macos-arm
+
+      - name: Install Pure Data
+        run: |
+          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
+          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz
+          sudo mv Pd-${{ env.PD_VERSION }}.app /Applications/
+          sudo mkdir -p /usr/local/include/pd
+          sudo ln -s /Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/src/*.h /usr/local/include/pd/
+
+      - name: Build pd-websocketserver for ARM
+        run: |
+          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L/Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/bin -arch arm64"
+        env:
+          CC: "ccache gcc"
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          # Rename the extension to indicate ARM architecture
+          find . -name "websocketserver*.pd_darwin" -exec cp {} artifacts/websocketserver.pd_arm64 \;
+          cp -f websocketserver-help.pd artifacts/ || true
+          cp -f send_receive.html artifacts/ || true
+          cp -f LICENSE artifacts/ || true
+          cp -f README.md artifacts/ || true
+          cp -f CHANGELOG.txt artifacts/ || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: websocketserver-macos-arm
+          path: artifacts/
+
+  # ===============================================================
+  Windows-Build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Restore build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: D:/ccache
+          key: ccache-windows-${{ github.run_id }}
+          restore-keys: |
+            ccache-windows-${{ github.sha }}
+            ccache-windows-
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc 
+            make
+            wget
+            unzip
+            tar
+            mingw64/mingw-w64-x86_64-ccache
+
+      - name: Get Pure Data
+        shell: msys2 {0}
+        run: |
+          wget -O pd-${{ env.PD_VERSION }}.msw.zip http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.msw.zip
+          unzip pd-${{ env.PD_VERSION }}.msw.zip
+          mkdir -p /mingw64/include/pd
+          cp pd-${{ env.PD_VERSION }}/src/*.h /mingw64/include/pd/
+
+      - name: Build pd-websocketserver
+        shell: msys2 {0}
+        run: |
+          export CCACHE_COMPRESS=1
+          export CCACHE_COMPRESSLEVEL=6
+          export CCACHE_MAXSIZE=1G
+          export CCACHE_DIR=D:/ccache
+          make CFLAGS="-I/mingw64/include/pd" CC="ccache gcc"
+          make localdep_windows
+          ccache -s
+        env:
+          CCACHE_COMPRESS: "1"
+          CCACHE_COMPRESSLEVEL: "6"
+          CCACHE_MAXSIZE: "1G"
+          CCACHE_DIR: D:/ccache
+
+      - name: Save build cache
+        uses: actions/cache/save@v4
+        with:
+          path: D:/ccache
+          key: ccache-windows-${{ github.run_id }}
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          find . -name "websocketserver*.dll" -exec cp {} artifacts/ \; || true
+          find . -name "websocketserver*.m_*" -exec cp {} artifacts/ \; || true
+          cp -f websocketserver-help.pd artifacts/ || true
+          cp -f send_receive.html artifacts/ || true
+          cp -f LICENSE artifacts/ || true
+          cp -f README.md artifacts/ || true
+          cp -f CHANGELOG.txt artifacts/ || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: websocketserver-windows
+          path: artifacts/
+
+  # ===============================================================
+  merge-and-release:
+    needs: [Linux-Build, macOS-Intel-Build, macOS-ARM-Build, Windows-Build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: Create merged package
+        run: |
+          mkdir -p websocketserver
+          cp -r all-artifacts/websocketserver-linux/* websocketserver/ || true
+          cp -r all-artifacts/websocketserver-macos-intel/* websocketserver/ || true
+          cp -r all-artifacts/websocketserver-macos-arm/* websocketserver/ || true
+          cp -r all-artifacts/websocketserver-windows/* websocketserver/ || true
+          zip -r websocketserver-all.zip websocketserver/
+          
+          # Also create platform-specific packages
+          cd all-artifacts
+          zip -r ../websocketserver-linux.zip websocketserver-linux/
+          zip -r ../websocketserver-macos.zip websocketserver-macos-intel/ websocketserver-macos-arm/
+          zip -r ../websocketserver-windows.zip websocketserver-windows/
+
+      - name: Upload merged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: websocketserver-complete
+          path: websocketserver/
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            websocketserver-all.zip
+            websocketserver-linux.zip
+            websocketserver-macos.zip
+            websocketserver-windows.zip
+          draft: true
