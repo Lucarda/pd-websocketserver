@@ -53,7 +53,7 @@ jobs:
 
     - name: Setup MSYS2 (Windows)
       if: matrix.platform == 'windows'
-      uses: msys2/setup-msys2@7efe20baefed56359938e4529ccf221313ad8f6e # v2
+      uses: msys2/setup-msys2@v2
       with:
         msystem: MINGW64
         update: true
