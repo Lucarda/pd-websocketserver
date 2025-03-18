@@ -68,26 +68,21 @@ jobs:
         with:
           key: ccache-macos-intel
 
-      - name: Install Pure Data binaries
+      - name: Install Pure Data via Homebrew
         run: |
-          # Download prebuilt binary for macOS
-          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
-          ls -la
-          # Extract properly
-          mkdir -p pd-extract
-          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz -C pd-extract
-          ls -la pd-extract
-          sudo mkdir -p /usr/local/include/pd
-          # Find and copy header files
-          find pd-extract -name "*.h" -exec sudo cp {} /usr/local/include/pd/ \;
+          brew update
+          brew install --cask pd
+          ls -la /Applications/Pd-*.app/Contents/Resources/
+          mkdir -p /usr/local/include/pd
+          # Copy header files to a standard location
+          sudo cp -r /Applications/Pd-*.app/Contents/Resources/src/*.h /usr/local/include/pd/
 
       - name: Build pd-websocketserver
         run: |
-          # Find pd bin path
-          PD_PATH=$(find pd-extract -name "pd" -type f -perm +111 | head -1)
-          PD_DIR=$(dirname "$PD_PATH")
-          echo "PD found at: $PD_DIR"
-          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L$PD_DIR"
+          # Find pd installation
+          PD_APP=$(find /Applications -name "Pd-*.app" | head -1)
+          echo "Found PD at: $PD_APP"
+          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L$PD_APP/Contents/Resources/bin"
         env:
           CC: "ccache gcc"
 
@@ -121,26 +116,21 @@ jobs:
         with:
           key: ccache-macos-arm
 
-      - name: Install Pure Data binaries
+      - name: Install Pure Data via Homebrew
         run: |
-          # Download prebuilt binary for macOS
-          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
-          ls -la
-          # Extract properly
-          mkdir -p pd-extract
-          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz -C pd-extract
-          ls -la pd-extract
-          sudo mkdir -p /usr/local/include/pd
-          # Find and copy header files
-          find pd-extract -name "*.h" -exec sudo cp {} /usr/local/include/pd/ \;
+          brew update
+          brew install --cask pd
+          ls -la /Applications/Pd-*.app/Contents/Resources/
+          mkdir -p /usr/local/include/pd
+          # Copy header files to a standard location
+          sudo cp -r /Applications/Pd-*.app/Contents/Resources/src/*.h /usr/local/include/pd/
 
       - name: Build pd-websocketserver for ARM
         run: |
-          # Find pd bin path
-          PD_PATH=$(find pd-extract -name "pd" -type f -perm +111 | head -1)
-          PD_DIR=$(dirname "$PD_PATH")
-          echo "PD found at: $PD_DIR"
-          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L$PD_DIR -arch arm64"
+          # Find pd installation
+          PD_APP=$(find /Applications -name "Pd-*.app" | head -1)
+          echo "Found PD at: $PD_APP"
+          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L$PD_APP/Contents/Resources/bin -arch arm64"
         env:
           CC: "ccache gcc"
 
