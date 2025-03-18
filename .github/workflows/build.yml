@@ -68,19 +68,26 @@ jobs:
         with:
           key: ccache-macos-intel
 
-      - name: Build Pure Data from source
+      - name: Install Pure Data binaries
         run: |
-          curl -L -o pd-${{ env.PD_VERSION }}.src.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.src.tar.gz
-          tar -xzf pd-${{ env.PD_VERSION }}.src.tar.gz
-          cd pd-${{ env.PD_VERSION }}
-          ./configure
-          make
+          # Download prebuilt binary for macOS
+          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
+          ls -la
+          # Extract properly
+          mkdir -p pd-extract
+          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz -C pd-extract
+          ls -la pd-extract
           sudo mkdir -p /usr/local/include/pd
-          sudo cp src/*.h /usr/local/include/pd/
+          # Find and copy header files
+          find pd-extract -name "*.h" -exec sudo cp {} /usr/local/include/pd/ \;
 
       - name: Build pd-websocketserver
         run: |
-          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L/pd-${{ env.PD_VERSION }}/bin"
+          # Find pd bin path
+          PD_PATH=$(find pd-extract -name "pd" -type f -perm +111 | head -1)
+          PD_DIR=$(dirname "$PD_PATH")
+          echo "PD found at: $PD_DIR"
+          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L$PD_DIR"
         env:
           CC: "ccache gcc"
 
@@ -114,19 +121,26 @@ jobs:
         with:
           key: ccache-macos-arm
 
-      - name: Build Pure Data from source
+      - name: Install Pure Data binaries
         run: |
-          curl -L -o pd-${{ env.PD_VERSION }}.src.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.src.tar.gz
-          tar -xzf pd-${{ env.PD_VERSION }}.src.tar.gz
-          cd pd-${{ env.PD_VERSION }}
-          ./configure
-          make
+          # Download prebuilt binary for macOS
+          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
+          ls -la
+          # Extract properly
+          mkdir -p pd-extract
+          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz -C pd-extract
+          ls -la pd-extract
           sudo mkdir -p /usr/local/include/pd
-          sudo cp src/*.h /usr/local/include/pd/
+          # Find and copy header files
+          find pd-extract -name "*.h" -exec sudo cp {} /usr/local/include/pd/ \;
 
       - name: Build pd-websocketserver for ARM
         run: |
-          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L/pd-${{ env.PD_VERSION }}/bin -arch arm64"
+          # Find pd bin path
+          PD_PATH=$(find pd-extract -name "pd" -type f -perm +111 | head -1)
+          PD_DIR=$(dirname "$PD_PATH")
+          echo "PD found at: $PD_DIR"
+          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L$PD_DIR -arch arm64"
         env:
           CC: "ccache gcc"
 
@@ -181,20 +195,15 @@ jobs:
       - name: Get Pure Data
         shell: msys2 {0}
         run: |
-          wget -O pd-${{ env.PD_VERSION }}.src.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.src.tar.gz
-          tar -xzf pd-${{ env.PD_VERSION }}.src.tar.gz
-          cd pd-${{ env.PD_VERSION }}
-          ./configure
-          make
+          # Download prebuilt binary for Windows
+          wget -O pd-${{ env.PD_VERSION }}.msw.zip http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.msw.zip
+          unzip -q pd-${{ env.PD_VERSION }}.msw.zip
           mkdir -p /mingw64/include/pd
-          cp src/*.h /mingw64/include/pd/
-
-      - name: Fix ws.c compile issues
-        run: |
-          sed -i 's/return (x->connection_index);/return NULL;/' src/ws.c
-          sed -i 's/void \*ws_establishconnection(t_websocketserver \*x)/void *ws_establishconnection(void *userdata)/' src/ws.c
-          sed -i 's/connection_index = x->connection_index;/t_websocketserver *x = (t_websocketserver *)userdata;\n\tconnection_index = x->connection_index;/' src/ws.c
-        shell: bash
+          # Copy Windows header files
+          cp pd-${{ env.PD_VERSION }}/src/*.h /mingw64/include/pd/
+          # Create symbolic link for pd-lib-builder
+          mkdir -p "C:/Program Files"
+          ln -sf "$PWD/pd-${{ env.PD_VERSION }}" "/C/Program Files/Pd"
 
       - name: Build pd-websocketserver
         shell: msys2 {0}
@@ -203,7 +212,9 @@ jobs:
           export CCACHE_COMPRESSLEVEL=6
           export CCACHE_MAXSIZE=1G
           export CCACHE_DIR=D:/ccache
-          make CFLAGS="-I/mingw64/include/pd -I./pd-${{ env.PD_VERSION }}/src" CC="ccache gcc"
+          
+          # Use Windows-compatible compiler flags
+          make CFLAGS="-I/mingw64/include/pd -Wno-error -fpermissive" CC="ccache gcc"
           make localdep_windows
           ccache -s
         env:
