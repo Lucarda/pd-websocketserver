@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  PD_VERSION: 0.54-1
+  PD_VERSION: 0.55-2
   CMAKE_BUILD_PARALLEL_LEVEL: 4
 
 jobs:
@@ -68,17 +68,19 @@ jobs:
         with:
           key: ccache-macos-intel
 
-      - name: Install Pure Data
+      - name: Build Pure Data from source
         run: |
-          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
-          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz
-          sudo mv Pd-${{ env.PD_VERSION }}.app /Applications/
+          curl -L -o pd-${{ env.PD_VERSION }}.src.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.src.tar.gz
+          tar -xzf pd-${{ env.PD_VERSION }}.src.tar.gz
+          cd pd-${{ env.PD_VERSION }}
+          ./configure
+          make
           sudo mkdir -p /usr/local/include/pd
-          sudo ln -s /Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/src/*.h /usr/local/include/pd/
+          sudo cp src/*.h /usr/local/include/pd/
 
       - name: Build pd-websocketserver
         run: |
-          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L/Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/bin"
+          make CFLAGS="-I/usr/local/include/pd" LDFLAGS="-L/pd-${{ env.PD_VERSION }}/bin"
         env:
           CC: "ccache gcc"
 
@@ -112,17 +114,19 @@ jobs:
         with:
           key: ccache-macos-arm
 
-      - name: Install Pure Data
+      - name: Build Pure Data from source
         run: |
-          curl -L -o pd-${{ env.PD_VERSION }}.macos.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.macos.tar.gz
-          tar -xzf pd-${{ env.PD_VERSION }}.macos.tar.gz
-          sudo mv Pd-${{ env.PD_VERSION }}.app /Applications/
+          curl -L -o pd-${{ env.PD_VERSION }}.src.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.src.tar.gz
+          tar -xzf pd-${{ env.PD_VERSION }}.src.tar.gz
+          cd pd-${{ env.PD_VERSION }}
+          ./configure
+          make
           sudo mkdir -p /usr/local/include/pd
-          sudo ln -s /Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/src/*.h /usr/local/include/pd/
+          sudo cp src/*.h /usr/local/include/pd/
 
       - name: Build pd-websocketserver for ARM
         run: |
-          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L/Applications/Pd-${{ env.PD_VERSION }}.app/Contents/Resources/bin -arch arm64"
+          make CFLAGS="-I/usr/local/include/pd -arch arm64" LDFLAGS="-L/pd-${{ env.PD_VERSION }}/bin -arch arm64"
         env:
           CC: "ccache gcc"
 
@@ -177,10 +181,20 @@ jobs:
       - name: Get Pure Data
         shell: msys2 {0}
         run: |
-          wget -O pd-${{ env.PD_VERSION }}.msw.zip http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.msw.zip
-          unzip pd-${{ env.PD_VERSION }}.msw.zip
+          wget -O pd-${{ env.PD_VERSION }}.src.tar.gz http://msp.ucsd.edu/Software/pd-${{ env.PD_VERSION }}.src.tar.gz
+          tar -xzf pd-${{ env.PD_VERSION }}.src.tar.gz
+          cd pd-${{ env.PD_VERSION }}
+          ./configure
+          make
           mkdir -p /mingw64/include/pd
-          cp pd-${{ env.PD_VERSION }}/src/*.h /mingw64/include/pd/
+          cp src/*.h /mingw64/include/pd/
+
+      - name: Fix ws.c compile issues
+        run: |
+          sed -i 's/return (x->connection_index);/return NULL;/' src/ws.c
+          sed -i 's/void \*ws_establishconnection(t_websocketserver \*x)/void *ws_establishconnection(void *userdata)/' src/ws.c
+          sed -i 's/connection_index = x->connection_index;/t_websocketserver *x = (t_websocketserver *)userdata;\n\tconnection_index = x->connection_index;/' src/ws.c
+        shell: bash
 
       - name: Build pd-websocketserver
         shell: msys2 {0}
@@ -189,7 +203,7 @@ jobs:
           export CCACHE_COMPRESSLEVEL=6
           export CCACHE_MAXSIZE=1G
           export CCACHE_DIR=D:/ccache
-          make CFLAGS="-I/mingw64/include/pd" CC="ccache gcc"
+          make CFLAGS="-I/mingw64/include/pd -I./pd-${{ env.PD_VERSION }}/src" CC="ccache gcc"
           make localdep_windows
           ccache -s
         env:
