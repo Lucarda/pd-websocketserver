@@ -74,14 +74,14 @@ jobs:
           sudo apt-get install -y build-essential puredata-dev
 
       - name: Build pd-websocketserver
-        run: make
+        run: make extension=l_arm64
         env:
           CC: "ccache gcc"
 
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
-          find . -name "websocketserver*.pd_linux" -exec cp {} artifacts/websocketserver.pd_arm64 \;
+          find . -name "websocketserver*.l_arm64" -exec cp {} artifacts/ \;
           cp -f websocketserver-help.pd artifacts/ || true
           cp -f send_receive.html artifacts/ || true
           cp -f LICENSE artifacts/ || true
@@ -184,15 +184,15 @@ jobs:
           echo "Found PD at: $PD_APP"
           # Add -Wno-error=int-conversion and -Wno-error=incompatible-function-pointer-types flags
           # for ARM build as well
-          make CFLAGS="-I$HOME/pd_include -arch arm64 -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" LDFLAGS="-L$PD_APP/Contents/Resources/bin -arch arm64"
+          make CFLAGS="-I$HOME/pd_include -arch arm64 -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" LDFLAGS="-L$PD_APP/Contents/Resources/bin -arch arm64" extension=d_arm64
         env:
           CC: "ccache gcc"
 
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
-          # Rename the extension to indicate ARM architecture
-          find . -name "websocketserver*.pd_darwin" -exec cp {} artifacts/websocketserver.pd_arm64 \;
+          # Look for the correct ARM extension
+          find . -name "websocketserver*.d_arm64" -exec cp {} artifacts/ \;
           cp -f websocketserver-help.pd artifacts/ || true
           cp -f send_receive.html artifacts/ || true
           cp -f LICENSE artifacts/ || true
