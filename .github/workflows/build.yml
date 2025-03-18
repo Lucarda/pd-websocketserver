@@ -55,6 +55,46 @@ jobs:
           path: artifacts/
 
   # ===============================================================
+  Linux-ARM64-Build:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-linux-arm64
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential puredata-dev
+
+      - name: Build pd-websocketserver
+        run: make
+        env:
+          CC: "ccache gcc"
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          find . -name "websocketserver*.pd_linux" -exec cp {} artifacts/websocketserver.pd_arm64 \;
+          cp -f websocketserver-help.pd artifacts/ || true
+          cp -f send_receive.html artifacts/ || true
+          cp -f LICENSE artifacts/ || true
+          cp -f README.md artifacts/ || true
+          cp -f CHANGELOG.txt artifacts/ || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: websocketserver-linux-arm64
+          path: artifacts/
+
+  # ===============================================================
   macOS-Intel-Build:
     runs-on: macos-latest
     steps:
@@ -253,7 +293,7 @@ jobs:
 
   # ===============================================================
   merge-and-release:
-    needs: [Linux-Build, macOS-Intel-Build, macOS-ARM-Build, Windows-Build]
+    needs: [Linux-Build, Linux-ARM64-Build, macOS-Intel-Build, macOS-ARM-Build, Windows-Build]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -265,6 +305,7 @@ jobs:
         run: |
           mkdir -p websocketserver
           cp -r all-artifacts/websocketserver-linux/* websocketserver/ || true
+          cp -r all-artifacts/websocketserver-linux-arm64/* websocketserver/ || true
           cp -r all-artifacts/websocketserver-macos-intel/* websocketserver/ || true
           cp -r all-artifacts/websocketserver-macos-arm/* websocketserver/ || true
           cp -r all-artifacts/websocketserver-windows/* websocketserver/ || true
@@ -272,7 +313,7 @@ jobs:
           
           # Also create platform-specific packages
           cd all-artifacts
-          zip -r ../websocketserver-linux.zip websocketserver-linux/
+          zip -r ../websocketserver-linux.zip websocketserver-linux/ websocketserver-linux-arm64/
           zip -r ../websocketserver-macos.zip websocketserver-macos-intel/ websocketserver-macos-arm/
           zip -r ../websocketserver-windows.zip websocketserver-windows/
 
