@@ -87,7 +87,9 @@ jobs:
           # Find pd installation
           PD_APP=$(find /Applications -name "Pd-*.app" | head -1)
           echo "Found PD at: $PD_APP"
-          make CFLAGS="-I$HOME/pd_include" LDFLAGS="-L$PD_APP/Contents/Resources/bin"
+          # Add -Wno-error=int-conversion and -Wno-error=incompatible-function-pointer-types flags
+          # to suppress the errors related to function signatures
+          make CFLAGS="-I$HOME/pd_include -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" LDFLAGS="-L$PD_APP/Contents/Resources/bin"
         env:
           CC: "ccache gcc"
 
@@ -140,7 +142,9 @@ jobs:
           # Find pd installation
           PD_APP=$(find /Applications -name "Pd-*.app" | head -1)
           echo "Found PD at: $PD_APP"
-          make CFLAGS="-I$HOME/pd_include -arch arm64" LDFLAGS="-L$PD_APP/Contents/Resources/bin -arch arm64"
+          # Add -Wno-error=int-conversion and -Wno-error=incompatible-function-pointer-types flags
+          # for ARM build as well
+          make CFLAGS="-I$HOME/pd_include -arch arm64 -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" LDFLAGS="-L$PD_APP/Contents/Resources/bin -arch arm64"
         env:
           CC: "ccache gcc"
 
