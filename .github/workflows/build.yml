@@ -53,7 +53,7 @@ jobs:
 
     - name: Setup MSYS2 (Windows)
       if: matrix.platform == 'windows'
-      uses: msys2/setup-msys2@v2
+      uses: msys2/setup-msys2@7efe20baefed56359938e4529ccf221313ad8f6e # v2
       with:
         msystem: MINGW64
         update: true
@@ -101,7 +101,7 @@ jobs:
         cp -f CHANGELOG.txt artifacts/ || true
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: websocketserver-${{ matrix.platform }}
         path: artifacts/
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Download all artifacts
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4
 
     - name: Zip artifacts
       run: |
