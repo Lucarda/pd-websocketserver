@@ -28,7 +28,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: recursive
     
@@ -101,7 +101,7 @@ jobs:
         cp -f CHANGELOG.txt artifacts/ || true
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v2
       with:
         name: websocketserver-${{ matrix.platform }}
         path: artifacts/
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v2
 
     - name: Zip artifacts
       run: |
