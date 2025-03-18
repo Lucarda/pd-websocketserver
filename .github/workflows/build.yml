@@ -1,0 +1,130 @@
+name: Build pd-websocketserver
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            extension: pd_linux
+          - os: macos-latest
+            platform: macos
+            extension: pd_darwin
+          - os: windows-latest
+            platform: windows
+            extension: dll
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y puredata-dev build-essential
+
+    - name: Build (Linux)
+      if: matrix.platform == 'linux'
+      run: make
+
+    - name: Install dependencies (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        brew install pure-data
+
+    - name: Build (macOS)
+      if: matrix.platform == 'macos'
+      run: make
+
+    - name: Setup MSYS2 (Windows)
+      if: matrix.platform == 'windows'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc 
+          make
+
+    - name: Build (Windows)
+      if: matrix.platform == 'windows'
+      shell: msys2 {0}
+      run: |
+        make
+        make localdep_windows
+
+    - name: Create artifacts directory
+      run: mkdir -p artifacts
+
+    - name: Find and copy artifacts (Linux/macOS) 
+      if: matrix.platform != 'windows'
+      run: |
+        # Copy the main binary
+        find . -name "websocketserver*.${EXTENSION}" -exec cp {} artifacts/ \;
+        # Copy supporting files
+        cp -f websocketserver-help.pd artifacts/ || true
+        cp -f send_receive.html artifacts/ || true
+        cp -f LICENSE artifacts/ || true
+        cp -f README.md artifacts/ || true
+        cp -f CHANGELOG.txt artifacts/ || true
+      shell: bash
+      env:
+        EXTENSION: ${{ matrix.extension }}
+
+    - name: Find and copy artifacts (Windows)
+      if: matrix.platform == 'windows'
+      shell: bash
+      run: |
+        # Copy the main binaries
+        find . -name "websocketserver*.dll" -exec cp {} artifacts/ \; || true
+        find . -name "websocketserver*.m_*" -exec cp {} artifacts/ \; || true
+        # Copy supporting files
+        cp -f websocketserver-help.pd artifacts/ || true
+        cp -f send_receive.html artifacts/ || true
+        cp -f LICENSE artifacts/ || true
+        cp -f README.md artifacts/ || true
+        cp -f CHANGELOG.txt artifacts/ || true
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: websocketserver-${{ matrix.platform }}
+        path: artifacts/
+
+  create-release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Zip artifacts
+      run: |
+        zip -r websocketserver-linux.zip websocketserver-linux/
+        zip -r websocketserver-macos.zip websocketserver-macos/
+        zip -r websocketserver-windows.zip websocketserver-windows/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          websocketserver-linux.zip
+          websocketserver-macos.zip
+          websocketserver-windows.zip
+        draft: true
