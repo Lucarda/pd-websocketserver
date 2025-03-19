@@ -58,7 +58,7 @@ jobs:
  
     - name: Build 
       run: | 
-        make CFLAGS="-m32 -Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" LDFLAGS=-m32 PDDIR=./pure-data/ PDLIBDIR=./out extension=l_i386 install
+        make CFLAGS="-m32 -Wno-error=int-conversion -Wno-error=incompatible-pointer-types" LDFLAGS=-m32 PDDIR=./pure-data/ PDLIBDIR=./out extension=l_i386 install
        
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -86,7 +86,7 @@ jobs:
     - name: Build 
       run: | 
         # Native ARM64 build - no cross compilation needed
-        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" PDDIR=./pure-data/ PDLIBDIR=./out extension=l_arm64 install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pure-data/ PDLIBDIR=./out extension=l_arm64 install
     
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -126,7 +126,7 @@ jobs:
       shell: msys2 {0}
       run: |
         # Use compiler flags to turn errors into warnings
-        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" PDDIR=./pd PDLIBDIR=./out extension=m_amd64 install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_amd64 install
         # Run localdeps to handle dependencies
         cd out/websocketserver && ./localdeps.win.sh websocketserver.dll
         
@@ -169,7 +169,7 @@ jobs:
       shell: msys2 {0}
       run: |
         # Use compiler flags to turn errors into warnings
-        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" PDDIR=./pd PDLIBDIR=./out extension=m_i386 install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_i386 install
         # Run localdeps to handle dependencies
         cd out/websocketserver && ./localdeps.win.sh websocketserver.dll
         
@@ -198,7 +198,7 @@ jobs:
     - name: Build
       run: |
         # Use compiler flags to turn errors into warnings
-        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-function-pointer-types -fpermissive" PDDIR=./pure-data/ PDLIBDIR=./out arch="x86_64 arm64" extension=d_fat install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pure-data/ PDLIBDIR=./out arch="x86_64 arm64" extension=d_fat install
         
     - name: Upload Zip
       uses: actions/upload-artifact@v4
