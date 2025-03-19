@@ -109,7 +109,12 @@ jobs:
       name: "Install mingw"
       uses: msys2/setup-msys2@v2
       with:
-          install: make mingw-w64-x86_64-gcc unzip curl
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-ntldd
+            unzip
+            curl
           update: false
 
     - if: runner.os == 'Windows'
@@ -128,7 +133,7 @@ jobs:
         # Use compiler flags to turn errors into warnings
         make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_amd64 install
         # Run localdeps to handle dependencies
-        cd out/websocketserver && ./localdeps.win.sh websocketserver.dll
+        cd out/websocketserver && NTLDD=ntldd ./localdeps.win.sh websocketserver.m_amd64
         
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -151,7 +156,12 @@ jobs:
       name: "Install mingw"
       uses: msys2/setup-msys2@v2
       with:
-          install: make mingw-w64-i686-gcc unzip curl
+          install: >-
+            make
+            mingw-w64-i686-gcc
+            mingw-w64-i686-ntldd
+            unzip
+            curl
           msystem: MINGW32
           update: false
           
@@ -171,7 +181,7 @@ jobs:
         # Use compiler flags to turn errors into warnings
         make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_i386 install
         # Run localdeps to handle dependencies
-        cd out/websocketserver && ./localdeps.win.sh websocketserver.dll
+        cd out/websocketserver && NTLDD=ntldd ./localdeps.win.sh websocketserver.m_i386
         
     - name: Upload Zip
       uses: actions/upload-artifact@v4
