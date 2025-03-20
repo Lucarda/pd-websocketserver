@@ -1,11 +1,15 @@
 *.o
-*.pd_*
-# Mac OS X
-*.dylib
-*.d_*
-# GNU/Linux
-*.so
-*.l_*
-# Windows
+*.pd_linux
+*.pd_darwin
 *.dll
-*.m_*
+*.m_amd64
+*.m_i386
+*.l_amd64
+*.l_i386
+*.l_arm
+*.l_arm64
+*.d_amd64
+*.d_i386
+*.d_arm64
+*.d_fat
+out/

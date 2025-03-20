@@ -30,7 +30,6 @@ datafiles = \
 
 define forWindows
   ldlibs = -lws2_32 
-  datafiles += scripts/localdeps.win.sh 
 endef
 
 
@@ -42,8 +41,4 @@ PDLIBBUILDER_DIR=./pd-lib-builder
 include $(PDLIBBUILDER_DIR)/Makefile.pdlibbuilder
 
 localdep_windows: install
-	cd "${installpath}"; ./localdeps.win.sh websocketserver.dll; \
-	mv websocketserver.dll websocketserver.$(arch); \
-	rm ./localdeps.win.sh \
-	
-	
+	scripts/localdeps.win.sh "${installpath}/websocketserver.${extension}"
