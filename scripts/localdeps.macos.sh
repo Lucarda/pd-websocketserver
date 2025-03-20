@@ -5,20 +5,9 @@
 
 ## usage: $0 <binary> [<binary2>...]
 
-
-###########################################
-# WARNING
-#
-# this uses an ugly hack to allow side-by-side installation of 32bit and 64bit
-# dependencies:
-# embedded dependencies are renamed from "libfoo.dll" to "libfoo.w32" resp.
-# "libfoo.w64", and the files are modified (using 'sed') to reflect this
-# renaming.
-# this is somewhat brittle and likely to break!
-
 #default exclude/include paths
-exclude_paths=""
-include_paths="*mingw*:*/msys/*"
+exclude_paths="/usr/lib/*:/System/Library/Frameworks/*"
+include_paths="/*"
 
 # UTILITIES
 if [ -e "${0%/*}/localdeps.utilities.source" ]; then
@@ -228,91 +217,85 @@ fi
 #@END_UTILITIES@
 fi
 
-CYGPATH=$(which cygpath 2>/dev/null)
-if [ -z "${CYGPATH}" ]; then
-    CYGPATH=echo
-fi
-
-normalize_path() {
-    # convert to unix-format (C:\foo\bar\ --> /c/foo/bar/)
-    # and lower-case everything (because on microsoft-fs, paths are case-insensitive)
-    ${CYGPATH} "$1" | tr "[A-Z]" "[a-z]"
+basename () {
+    local x=${1##*/}
+    if [ "x$x" = "x" ]; then
+        echo $1
+    else
+        echo $x
+    fi
+}
+dirname () {
+    local x=${1%/*}
+    if [ "x$x" = "x" ]; then
+        echo .
+    else
+        echo $x
+    fi
 }
 
 list_deps() {
     local path
-    local path0
     local inc
-    "${NTLDD}" "$1" \
-	| grep ' => ' \
-	| sed -e 's|\\|/|g' -e 's|.* => ||' -e 's| (0.*||' \
-	| while read path; do
-	path0=$(echo $path |sed -e 's|/|\\|g')
-	inc=$(check_includedep "${path0}")
+    ${OTOOL} "$1" \
+        | grep -v ":$" \
+	| grep compatibility \
+	| awk '{print $1}' \
+	| egrep '^/' \
+        | while read path; do
+        inc=$(check_includedep "${path}")
 	if [ "x${inc}" != "x" ]; then
-	    echo "${path}"
+	    echo "${inc}"
 	fi
     done
 }
 
-file2arch() {
-    if file "$1" | grep -w "PE32+" >/dev/null; then
-        echo "w64"
-        return
-    fi
-    if file "$1" | grep -w "PE32" >/dev/null; then
-        echo "w32"
-        return
-    fi
-}
-
 install_deps () {
     local outdir="$2"
-    local idepfile
-    local odepfile
-    local archext
+    local infile
+    local depfile
     local dep
     error "DEP: ${INSTALLDEPS_INDENT}'$1' '$2'"
 
     if [ "x${outdir}" = "x" ]; then
-        outdir=${1%/*}
+        outdir=$(dirname "$1")
     fi
     if [ ! -d "${outdir}" ]; then
         outdir=.
     fi
-
+    if $subdir; then
+        outdir="${outdir}/$(print_arch)"
+        mkdir -p "${outdir}"
+    fi
     list_deps "$1" | while read dep; do
-        idepfile=$(basename "${dep}")
-        odepfile=${idepfile}
-        archext=$(file2arch "${dep}")
-        if [ "x${archext}" != "x" ]; then
-            odepfile=$(echo ${idepfile} | sed -e "s|\.dll|.${archext}|")
+        infile=$(basename "$1")
+        depfile=$(basename "${dep}")
+        if $subdir; then
+            loaderpath="@loader_path/$(print_arch)/${depfile}"
+        else
+            loaderpath="@loader_path/${depfile}"
         fi
-        if [ "x${idepfile}" = "x${odepfile}" ]; then
-	    archext=""
-        fi
-        if [ -e "${outdir}/${odepfile}" ]; then
+        # make sure the binary looks for the dependency in the local path
+        install_name_tool -change "${dep}" "${loaderpath}" "$1"
+
+        if [ -e "${outdir}/${depfile}" ]; then
             error "DEP: ${INSTALLDEPS_INDENT}  ${dep} SKIPPED"
         else
-            error "DEP: ${INSTALLDEPS_INDENT}  ${dep} -> ${outdir}/${odepfile}"
-            cp "${dep}" "${outdir}/${odepfile}"
-            chmod a-x "${outdir}/${odepfile}"
-        fi
+            error "DEP: ${INSTALLDEPS_INDENT}  ${dep} -> ${outdir}"
+            cp "${dep}" "${outdir}"
+            chmod u+w "${outdir}/${depfile}"
 
-        if [ "x${archext}" != "x" ]; then
-            sed -b \
-                -e "s|${idepfile}|${odepfile}|g" \
-                -i \
-                "${outdir}/${odepfile}" "${dep}" "$1"
+            # make sure the dependency announces itself with the local path
+            install_name_tool -id "${loaderpath}" "${outdir}/${depfile}"
+            # recursively call ourselves, to resolve higher-order dependencies
+            INSTALLDEPS_INDENT="${INSTALLDEPS_INDENT}    " $0 "${outdir}/${depfile}"
         fi
-        #recursively resolve dependencies
-        INSTALLDEPS_INDENT="${INSTALLDEPS_INDENT}    " install_deps "${outdir}/${odepfile}"
     done
 }
 
-if [ "x${NTLDD}" = "x" ]; then
-    check_binaries ntldd
-    NTLDD="ntldd"
+if [ "x${OTOOL}" = "x" ]; then
+    check_binaries otool
+    OTOOL="otool -L"
 fi
 
 for f in "$@"; do
@@ -321,3 +304,21 @@ for f in "$@"; do
         install_deps "${f}"
     fi
 done
+
+# Code signing
+# On Monterey, binaries are automatically codesigned. Modifying them with this script renders the signature
+# invalid. When Pd loads an external with an invalid signature, it exits immediately. Thus, we need to make sure
+# that we codesign them again _after_ the localdeps process
+
+# This needs to be the absolutely last step. We don't do it while we're still inside a recursion.
+if $sign; then
+    echo -n "Code signing in progress... "
+    if $subdir; then
+        outdir="$(dirname "$1")/$(print_arch)"
+    else
+        outdir="$(dirname "$1")"
+    fi
+    codesign --remove-signature "${ARGS[@]}" ${outdir}/*.dylib
+    codesign -s -  "${ARGS[@]}" ${outdir}/*.dylib
+    echo "Done"
+fi

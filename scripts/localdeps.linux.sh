@@ -1,24 +1,22 @@
 #!/bin/sh
-
-## puts dependencies besides the binary
-# LATER: put dependencies into a separate folder
-
-## usage: $0 <binary> [<binary2>...]
-
-
-###########################################
-# WARNING
 #
-# this uses an ugly hack to allow side-by-side installation of 32bit and 64bit
-# dependencies:
-# embedded dependencies are renamed from "libfoo.dll" to "libfoo.w32" resp.
-# "libfoo.w64", and the files are modified (using 'sed') to reflect this
-# renaming.
-# this is somewhat brittle and likely to break!
+# creates local copies of all dependencies (dynamic libraries)
+# and sets RUNPATH to $ORIGIN on each so they will find
+# each other.
+#
+# usage: $0 <binary>
+
+
+
+verbose=0
+include_paths=
+exclude_paths=
+
+
 
 #default exclude/include paths
-exclude_paths=""
-include_paths="*mingw*:*/msys/*"
+exclude_paths="*/libc.so.*:*/libarmmem.*.so.*:*/libdl.so.*:*/libglib-.*.so.*:*/libgomp.so.*:*/libgthread.*.so.*:*/libm.so.*:*/libpthread.*.so.*:*/libpthread.so.*:*/libstdc++.so.*:*/libgcc_s.so.*:*/libpcre.so.*:*/libz.so.*"
+include_paths="/*"
 
 # UTILITIES
 if [ -e "${0%/*}/localdeps.utilities.source" ]; then
@@ -228,96 +226,67 @@ fi
 #@END_UTILITIES@
 fi
 
-CYGPATH=$(which cygpath 2>/dev/null)
-if [ -z "${CYGPATH}" ]; then
-    CYGPATH=echo
-fi
-
-normalize_path() {
-    # convert to unix-format (C:\foo\bar\ --> /c/foo/bar/)
-    # and lower-case everything (because on microsoft-fs, paths are case-insensitive)
-    ${CYGPATH} "$1" | tr "[A-Z]" "[a-z]"
-}
-
 list_deps() {
-    local path
-    local path0
+    local libpath
     local inc
-    "${NTLDD}" "$1" \
-	| grep ' => ' \
-	| sed -e 's|\\|/|g' -e 's|.* => ||' -e 's| (0.*||' \
-	| while read path; do
-	path0=$(echo $path |sed -e 's|/|\\|g')
-	inc=$(check_includedep "${path0}")
-	if [ "x${inc}" != "x" ]; then
-	    echo "${path}"
-	fi
+    ldd "$1" \
+        | grep ' => ' \
+        | while read _ _ libpath _; do
+        inc=$(check_includedep "${libpath}")
+        if [ "x${inc}" != "x" ]; then
+            echo "${inc}"
+        fi
     done
 }
-
-file2arch() {
-    if file "$1" | grep -w "PE32+" >/dev/null; then
-        echo "w64"
-        return
-    fi
-    if file "$1" | grep -w "PE32" >/dev/null; then
-        echo "w32"
-        return
-    fi
-}
-
 install_deps () {
-    local outdir="$2"
-    local idepfile
-    local odepfile
-    local archext
-    local dep
-    error "DEP: ${INSTALLDEPS_INDENT}'$1' '$2'"
-
-    if [ "x${outdir}" = "x" ]; then
-        outdir=${1%/*}
+    # make a local copy of all linked libraries of given binary
+    # and set RUNPATH to $ORIGIN (exclude "standard" libraries)
+    # arg1: binary to check
+    local outdir
+    local outfile
+    if $subdir; then
+        outdir="$(dirname "$1")/$(print_arch)"
+    else
+        outdir="$(dirname "$1")"
     fi
     if [ ! -d "${outdir}" ]; then
         outdir=.
     fi
-
-    list_deps "$1" | while read dep; do
-        idepfile=$(basename "${dep}")
-        odepfile=${idepfile}
-        archext=$(file2arch "${dep}")
-        if [ "x${archext}" != "x" ]; then
-            odepfile=$(echo ${idepfile} | sed -e "s|\.dll|.${archext}|")
+    list_deps "$1" | while read libpath; do
+        libname=$(basename "${libpath}")
+        if [ ! -e "${libpath}" ]; then
+            error "DEP: ${INSTALLDEPS_INDENT}  WARNING: could not make copy of '${libpath}'. Not found"
+            continue
         fi
-        if [ "x${idepfile}" = "x${odepfile}" ]; then
-	    archext=""
-        fi
-        if [ -e "${outdir}/${odepfile}" ]; then
-            error "DEP: ${INSTALLDEPS_INDENT}  ${dep} SKIPPED"
+        outfile="${outdir}/$(basename ${libpath})"
+        if [ -e  "${outfile}" ]; then
+            error "DEP: ${INSTALLDEPS_INDENT}  ${libpath} SKIPPED"
         else
-            error "DEP: ${INSTALLDEPS_INDENT}  ${dep} -> ${outdir}/${odepfile}"
-            cp "${dep}" "${outdir}/${odepfile}"
-            chmod a-x "${outdir}/${odepfile}"
+            error "DEP: ${INSTALLDEPS_INDENT}  ${libpath} -> ${outdir}/"
+            cp "${libpath}" "${outfile}"
+            patchelf --set-rpath \$ORIGIN "${outfile}"
         fi
-
-        if [ "x${archext}" != "x" ]; then
-            sed -b \
-                -e "s|${idepfile}|${odepfile}|g" \
-                -i \
-                "${outdir}/${odepfile}" "${dep}" "$1"
-        fi
-        #recursively resolve dependencies
-        INSTALLDEPS_INDENT="${INSTALLDEPS_INDENT}    " install_deps "${outdir}/${odepfile}"
     done
+    if $subdir; then
+        patchelf --set-rpath "\$ORIGIN/$(print_arch)" "${1}"
+    else
+        patchelf --set-rpath \$ORIGIN "${1}"
+    fi
 }
 
-if [ "x${NTLDD}" = "x" ]; then
-    check_binaries ntldd
-    NTLDD="ntldd"
-fi
+
+
+# Check dependencies
+check_binaries grep ldd patchelf
 
 for f in "$@"; do
-    if [ -e "${f}" ]; then
-        error
-        install_deps "${f}"
+    # Check if we can read from given file
+    if ! ldd "${f}" > /dev/null 2>&1; then
+        error "Skipping '${f}'. Is it a binary file?"
+        continue
     fi
+    if $subdir; then
+        mkdir -p "$(dirname ${f})/$(print_arch)"
+    fi
+    install_deps "${f}"
 done
