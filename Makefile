@@ -1,15 +1,11 @@
 # library name
 lib.name = websocketserver
 
-cflags = -I ./include 
+# todo: figure how to upgrade the code to not use the ugly -Wno-error=$ that is needed in modern compilers 
+
+cflags = -I ./include -Wno-error=int-conversion -Wno-error=incompatible-pointer-types
 ldlibs += -lpthread 
 
-WINARCH := $(shell $(CC) -dumpmachine)
-ifneq ($(filter i686%, $(WINARCH)),)
-	arch = m_i386
-else
-	arch = m_amd64
-endif
 
 websocketserver.class.sources = \
 	./src/base64/base64.c \
