@@ -27,7 +27,7 @@ jobs:
  
     - name: Build 
       run: | 
-        make PDDIR=./pure-data/ PDLIBDIR=./out extension=l_amd64 install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pure-data/ PDLIBDIR=./out extension=l_amd64 install
        
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -58,7 +58,7 @@ jobs:
  
     - name: Build 
       run: | 
-        make CFLAGS="-m32 -Wno-error=int-conversion -Wno-error=incompatible-pointer-types" LDFLAGS=-m32 PDDIR=./pure-data/ PDLIBDIR=./out extension=l_i386 install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types -m32"  LDFLAGS=-m32 PDDIR=./pure-data/ PDLIBDIR=./out extension=l_i386 install
        
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -70,12 +70,16 @@ jobs:
 # ===============================================================
 # ===============================================================
 
-  Linux-arm64-Native-Build:
-    runs-on: ubuntu-22.04-arm
+
+  Linux-arm-Builds:
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
     - name: Checkout submodules
       run: git submodule update --init --recursive
+    - name: Install arm-mutiarch
+      run: |
+        sudo apt install g++-arm-linux-gnueabihf g++-aarch64-linux-gnu -y
 
     - name: Download pd-Sources 
       run: | 
@@ -85,18 +89,18 @@ jobs:
  
     - name: Build 
       run: | 
-        # Native ARM64 build - no cross compilation needed
-        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pure-data/ PDLIBDIR=./out extension=l_arm64 install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" CC=arm-linux-gnueabihf-gcc PDDIR=./pure-data/ PDLIBDIR=./out extension=l_arm install
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" CC=aarch64-linux-gnu-gcc PDDIR=./pure-data/ PDLIBDIR=./out extension=l_arm64 install
     
     - name: Upload Zip
       uses: actions/upload-artifact@v4
       with:
-        name: pd-websocketserver-linux-arm64
+        name: pd-websocketserver-linux-arm-mutiarch
         path: ./out/*
 
-# ===============================================================
-# ===============================================================
-# ===============================================================
+# # # # ===============================================================
+# # # # ===============================================================
+# # # # ===============================================================
 
   Windows-amd64-Build:
     runs-on: windows-latest
@@ -109,12 +113,7 @@ jobs:
       name: "Install mingw"
       uses: msys2/setup-msys2@v2
       with:
-          install: >-
-            make
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-ntldd
-            unzip
-            curl
+          install: make mingw-w64-x86_64-gcc unzip curl mingw-w64-x86_64-ntldd
           update: false
 
     - if: runner.os == 'Windows'
@@ -125,12 +124,10 @@ jobs:
         unzip pure-data.zip
         rm pure-data.zip
         rename  pd-$PD_VERSION pd pd-$PD_VERSION
-        
     - if: runner.os == 'Windows'
       name: Build
       shell: msys2 {0}
       run: |
-        # Use compiler flags to turn errors into warnings
         make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_amd64 localdep_windows
         
     - name: Upload Zip
@@ -139,9 +136,9 @@ jobs:
         name: pd-websocketserver-windows-amd64
         path: ./out/*
          
-# ===============================================================
-# ===============================================================
-# ===============================================================
+# # # # ===============================================================
+# # # # ===============================================================
+# # # # ===============================================================
 
   Windows-i386-Build:
     runs-on: windows-latest
@@ -154,15 +151,9 @@ jobs:
       name: "Install mingw"
       uses: msys2/setup-msys2@v2
       with:
-          install: >-
-            make
-            mingw-w64-i686-gcc
-            mingw-w64-i686-ntldd
-            unzip
-            curl
+          install: make mingw-w64-i686-gcc unzip curl mingw-w64-i686-ntldd
           msystem: MINGW32
           update: false
-          
     - if: runner.os == 'Windows'
       name: Get Pd
       shell: msys2 {0}
@@ -176,7 +167,6 @@ jobs:
       name: Build
       shell: msys2 {0}
       run: |
-        # Use compiler flags to turn errors into warnings
         make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_i386 localdep_windows
         
     - name: Upload Zip
@@ -185,9 +175,9 @@ jobs:
         name: pd-websocketserver-windows-i386
         path: ./out/*
 
-# ===============================================================
-# ===============================================================
-# ===============================================================
+# # ===============================================================
+# # ===============================================================
+# # ===============================================================
   macOS-Universal-Build:
     runs-on: macos-latest
     steps:
@@ -203,11 +193,10 @@ jobs:
        
     - name: Build
       run: |
-        # Use compiler flags to turn errors into warnings
         make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pure-data/ PDLIBDIR=./out arch="x86_64 arm64" extension=d_fat install
         
     - name: Upload Zip
       uses: actions/upload-artifact@v4
       with:
-        name: pd-websocketserver-macOS-universal
+        name:  pd-websocketserver-macOS-universal
         path: ./out/*
