@@ -131,11 +131,7 @@ jobs:
       shell: msys2 {0}
       run: |
         # Use compiler flags to turn errors into warnings
-        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_amd64 install
-        # Run localdeps to handle dependencies
-        cd out/websocketserver && NTLDD=ntldd ./localdeps.win.sh websocketserver.m_amd64
-        # Remove localdeps.win.sh from the build to avoid bundling it in the artifact
-        rm -f ./localdeps.win.sh
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_amd64 localdep_windows
         
     - name: Upload Zip
       uses: actions/upload-artifact@v4
@@ -181,11 +177,7 @@ jobs:
       shell: msys2 {0}
       run: |
         # Use compiler flags to turn errors into warnings
-        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_i386 install
-        # Run localdeps to handle dependencies
-        cd out/websocketserver && NTLDD=ntldd ./localdeps.win.sh websocketserver.m_i386
-        # Remove localdeps.win.sh from the build to avoid bundling it in the artifact
-        rm -f ./localdeps.win.sh
+        make CFLAGS="-Wno-error=int-conversion -Wno-error=incompatible-pointer-types" PDDIR=./pd PDLIBDIR=./out extension=m_i386 localdep_windows
         
     - name: Upload Zip
       uses: actions/upload-artifact@v4
